@@ -1,4 +1,18 @@
-TOGT-Planner
+# TOGT-Planner
+
+**Time-Optimal Gate-Traversing (TOGT) Planner** is a super efficient racing trajectory generator that can accommondate a broad range of race tracks comprising gates with diverse shapes and sizes. It provides high trajectory quality in terms of dynamically feasibility by employing differential-flat nature of quadrotor systems and incorporating single-rotor thrust constriants.
+
+### Updates:
+
+- Feb. 19, 2024 - First version released
+
+### Related Papers
+
+If our repo helps your academic projects, please cite our paper. Thank you!
+
+- Time-Optimal Gate-Traversing Planner for Autonomous Drone Racing, Chao Qin, Maxime SJ Michet, Jingxiang Chen, and Hugh H.-T. Liu,  IEEE International Conference on Robotics and Automation (ICRA-2024)
+
+  
 
 
 
