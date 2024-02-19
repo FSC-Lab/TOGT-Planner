@@ -47,5 +47,6 @@ python3 plot_traj.py
 ## Acknowledgements
 
 - We use [LBFGS-Lite](https://github.com/ZJU-FAST-Lab/LBFGS-Lite) as the internal solver: An Easy-to-Use Header-Only L-BFGS Solver.
-- We use [GCOPTER](https://github.com/ZJU-FAST-Lab/GCOPTER) for geometric constraint elimination
+- We use [GCOPTER](https://github.com/ZJU-FAST-Lab/GCOPTER) for geometric constraint elimination.
+- We use several utility functions in [Agilicious](https://github.com/uzh-rpg/agilicious) to facilitate development.
 
