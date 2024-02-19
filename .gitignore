@@ -1,0 +1,14 @@
+# VScode stuff
+.vscode/*
+!.vscode/extensions.json
+
+# Build directory
+build/*
+
+# LLVM and Clang
+**/.cache
+**/checks.json
+
+# Compile Commands
+*/compile_commands.json
+*/.clangd

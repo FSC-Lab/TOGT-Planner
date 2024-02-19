@@ -1,0 +1,102 @@
+initState:
+  pos: [-5.0, 4.5, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+
+endState:
+  pos: [4.75, -0.9, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+
+orders: ['Gate1' , 'Gate2' , 'Gate3' , 'Gate4' , 'Gate5', 'Gate6' , 'Gate7']
+
+Gate1:
+  type: 'TrianglePrisma'
+  name: 'vicon_gate'
+  position: [-1.1, -1.6, 3.6]
+  rpy: [0.0, -90, 0.0]
+  width: 2.4
+  height: 2.4
+  margin: 0.0
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate2:
+  type: 'RectanglePrisma'
+  name: 'vicon_gate' 
+  position: [9.2, 6.6, 1]
+  rpy: [0.0, -90.0, -20.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.0
+  marginH: 0.0
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate3:
+  type: 'PentagonPrisma'
+  name: 'vicon_gate'
+  position: [9.2, -4.0, 1.2]
+  rpy: [0.0, -90, -130.0]
+  radius: 2.0
+  margin: 0.0
+  length: 16.0
+  midpoints: 1
+  stationary: true
+
+Gate4:
+  type: 'RectanglePrisma'
+  name: 'vicon_gate'
+  position: [-4.5, -6, 3.5]
+  rpy: [0.0, -90.0, 180.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.0
+  marginH: 0.0
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate5:
+  type: 'RectanglePrisma'
+  name: 'vicon_gate'
+  position: [-4.5, -6.0, 0.8]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.0
+  marginH: 0.0
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate6:
+  type: 'HexagonPrisma'
+  name: 'vicon_gate'
+  position: [4.75, -0.9, 1.2]
+  rpy: [0.0, -90.0, 70.0]
+  side: 1.5
+  margin: 0.0
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate7:
+  type: 'SingleBall'
+  name: 'vicon_gate'
+  position: [-2.8, 6.8, 1.2]
+  radius: 0.3
+  margin: 0
+  stationary: true
+
+

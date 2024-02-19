@@ -1,0 +1,337 @@
+
+bool QuadManifold::toState(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+  output.state.t = t;
+  output.input.t = t;
+
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+
+  Eigen::Vector3d& omgInput = output.input.omega; 
+  Eigen::Vector4d& thrusts = output.input.thrusts; 
+  double& thrust = output.input.collective_thrust; 
+
+  pos = input.col(0);
+  vel = input.col(1);  
+  acc = input.col(2);
+  jer = input.col(3);
+  sna = input.col(4);
+
+  a0 = acc(0);
+  a1 = acc(1);
+  a2 = acc(2);
+  j0 = jer(0);
+  j1 = jer(1);
+  j2 = jer(2);
+  s0 = sna(0);
+  s1 = sna(1);
+  s2 = sna(2);
+  const double psi = yaw(0);
+  const double dpsi = yaw(1);
+  const double ddpsi = yaw(2);
+
+  c_half_psi = cos(0.5 * psi);
+  s_half_psi = sin(0.5 * psi);
+  c_psi = cos(psi);
+  s_psi = sin(psi);
+
+  // alpha = a + gzW
+  alpha0 = a0;
+  alpha1 = a1;
+  alpha2 = a2 + G;
+  alpha << alpha0, alpha1, alpha2;
+
+  alpha_sqr0 = alpha0 * alpha0;
+  alpha_sqr1 = alpha1 * alpha1;
+  alpha_sqr2 = alpha2 * alpha2;
+  alpha_norm_2 = alpha_sqr0 + alpha_sqr1 + alpha_sqr2;
+  alpha_norm_1 = sqrt(alpha_norm_2);
+  alpha_norm_3 = alpha_norm_2 * alpha_norm_1;
+  alpha_norm_5 = alpha_norm_2 * alpha_norm_3;
+  alpha_dot_j = alpha0 * j0 + alpha1 * j1 + alpha2 * j2;
+  alpha_dot_j_sqr = alpha_dot_j * alpha_dot_j;
+  j_norm_2 = j0 * j0 + j1 * j1 + j2 * j2;
+
+  // zB = N(a+gzW)
+  zB0 = alpha0 / alpha_norm_1;
+  zB1 = alpha1 / alpha_norm_1;
+  zB2 = alpha2 / alpha_norm_1;
+  zB << zB0, zB1, zB2;
+
+  alpha01 = alpha0 * alpha1;
+  alpha12 = alpha1 * alpha2;
+  alpha02 = alpha0 * alpha2;
+
+  ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
+  ng01 = -alpha01 / alpha_norm_3;
+  ng02 = -alpha02 / alpha_norm_3;
+  ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
+  ng12 = -alpha12 / alpha_norm_3;
+  ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
+
+  DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
+
+  // dzB
+  dzB = DN_alpha * jer;
+  dzB0 = dzB(0);
+  dzB1 = dzB(1);
+  dzB2 = dzB(2);
+  dzB2_sqr = dzB2 * dzB2;
+
+  // ddzB
+  DN_alpha_s = DN_alpha * sna;
+  ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 -
+          alpha * j_norm_2 / alpha_norm_3 +
+          alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
+  ddzB0 = ddzB(0);
+  ddzB1 = ddzB(1);
+  ddzB2 = ddzB(2);
+
+  // collective thrust: thrust-mass ratio
+  thrust = zB0 * a0 + zB1 * a1 + zB2 * (a2 + G);
+
+  // quaternion
+  const double zB2_1 = zB2 + 1;
+  if (fabs(zB2_1) < 1.0e-3) {
+    return false;
+  }
+
+  tilt_den_2 = 2.0 * (zB2_1);
+  tilt_den = sqrt(tilt_den_2);
+  tilt_den_3 = tilt_den_2 * tilt_den;
+
+  tilt0 = 0.5 * tilt_den;
+  tilt1 = -zB1 / tilt_den;
+  tilt2 = zB0 / tilt_den;
+  
+  quat(0) = tilt0 * c_half_psi;
+  quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
+  quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
+  quat(3) = tilt0 * s_half_psi;
+
+  // bodyrate
+  omg_den = zB2_1;
+  omg_den_2 = omg_den * omg_den;
+  omg_den_4 = omg_den_2 * omg_den_2;
+
+  omg_term = dzB2 / omg_den;
+  tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
+  tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
+  tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
+  omg(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
+  omg(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
+  omg(2) = tmp_omg_3 / omg_den + dpsi;
+  omgInput = omg;
+
+  // body acceleration
+  tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
+  tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
+  tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
+  omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den -
+              dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
+
+  omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den -
+              dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
+
+  omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
+
+  tau(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
+  tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
+  tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
+
+  thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
+
+  return true;
+  
+}
+
+bool QuadManifold::toState(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+  output.state.t = t;
+  output.input.t = t;
+
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+
+  Eigen::Vector3d& omgInput = output.input.omega; 
+  Eigen::Vector4d& thrusts = output.input.thrusts; 
+  double& collective_thrust = output.input.collective_thrust; 
+
+  pos = input.col(0);
+  vel = input.col(1);  
+  acc = input.col(2);
+  jer = input.col(3);
+  sna = input.col(4);
+
+  a0 = acc(0);
+  a1 = acc(1);
+  a2 = acc(2);
+  j0 = jer(0);
+  j1 = jer(1);
+  j2 = jer(2);
+  s0 = sna(0);
+  s1 = sna(1);
+  s2 = sna(2);
+  const double psi = yaw(0);
+  const double dpsi = yaw(1);
+  const double ddpsi = yaw(2);
+
+  c_half_psi = cos(0.5 * psi);
+  s_half_psi = sin(0.5 * psi);
+  c_psi = cos(psi);
+  s_psi = sin(psi);
+
+  // alpha = a + gzW
+  alpha0 = a0;
+  alpha1 = a1;
+  alpha2 = a2 + G;
+  alpha << alpha0, alpha1, alpha2;
+
+  alpha_sqr0 = alpha0 * alpha0;
+  alpha_sqr1 = alpha1 * alpha1;
+  alpha_sqr2 = alpha2 * alpha2;
+  alpha_norm_2 = alpha_sqr0 + alpha_sqr1 + alpha_sqr2;
+  alpha_norm_1 = sqrt(alpha_norm_2);
+  alpha_norm_3 = alpha_norm_2 * alpha_norm_1;
+  alpha_norm_5 = alpha_norm_2 * alpha_norm_3;
+  alpha_norm_7 = alpha_norm_2 * alpha_norm_5;
+  alpha_dot_j = alpha0 * j0 + alpha1 * j1 + alpha2 * j2;
+  alpha_dot_j_sqr = alpha_dot_j * alpha_dot_j;
+  j_norm_2 = j0 * j0 + j1 * j1 + j2 * j2;
+
+  // zB = N(a+gzW)
+  zB0 = alpha0 / alpha_norm_1;
+  zB1 = alpha1 / alpha_norm_1;
+  zB2 = alpha2 / alpha_norm_1;
+  zB << zB0, zB1, zB2;
+
+  alpha01 = alpha0 * alpha1;
+  alpha12 = alpha1 * alpha2;
+  alpha02 = alpha0 * alpha2;
+
+  ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
+  ng01 = -alpha01 / alpha_norm_3;
+  ng02 = -alpha02 / alpha_norm_3;
+  ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
+  ng12 = -alpha12 / alpha_norm_3;
+  ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
+
+  DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
+
+  // dzB
+  dzB = DN_alpha * jer;
+  dzB0 = dzB(0);
+  dzB1 = dzB(1);
+  dzB2 = dzB(2);
+  dzB2_sqr = dzB2 * dzB2;
+
+  // ddzB
+  DN_alpha_s = DN_alpha * sna;
+  ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 -
+          alpha * j_norm_2 / alpha_norm_3 +
+          alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
+  ddzB0 = ddzB(0);
+  ddzB1 = ddzB(1);
+  ddzB2 = ddzB(2);
+
+  // collective thrust: thrust-mass ratio
+  collective_thrust = zB0 * a0 + zB1 * a1 + zB2 * (a2 + G);
+
+  // quaternion
+  const double zB2_1 = zB2 + 1;
+  if (fabs(zB2_1) < 1.0e-3) {
+    return false;
+  }
+
+  tilt_den_2 = 2.0 * (zB2_1);
+  tilt_den = sqrt(tilt_den_2);
+  tilt_den_3 = tilt_den_2 * tilt_den;
+
+  tilt0 = 0.5 * tilt_den;
+  tilt1 = -zB1 / tilt_den;
+  tilt2 = zB0 / tilt_den;
+  
+  quat(0) = tilt0 * c_half_psi;
+  quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
+  quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
+  quat(3) = tilt0 * s_half_psi;
+
+  // bodyrate
+  omg_den = zB2_1;
+  omg_den_2 = omg_den * omg_den;
+  omg_den_4 = omg_den_2 * omg_den_2;
+
+  omg_term = dzB2 / omg_den;
+  tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
+  tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
+  tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
+  omg(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
+  omg(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
+  omg(2) = tmp_omg_3 / omg_den + dpsi;
+  omgInput = omg;
+
+  // body acceleration
+  tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
+  tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
+  tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
+  omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den -
+              dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
+
+  omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den -
+              dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
+
+  omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
+
+  tau(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
+  tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
+  tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
+
+  thrusts = params_.T_mb * (Eigen::Vector4d() << collective_thrust * params_.mass, tau).finished();
+
+  return true;
+
+
+  // output.state.t = t;
+  // output.input.t = t;
+
+  // Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  // Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  // Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  // Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  // Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  // Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  // Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+  // Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+
+  // Eigen::Vector3d& omgInput = output.input.omega; 
+  // Eigen::Vector4d& thrusts = output.input.thrusts; 
+  // double& thrust = output.input.collective_thrust; 
+
+  // pos = input.col(0);
+  // vel = input.col(1);  
+  // acc = input.col(2);
+  // jer = input.col(3);
+  // sna = input.col(4);
+  // // Eigen::Quaterniond(Eigen::AngleAxis<double>(yaw(0), Eigen::Vector3d::UnitZ()))
+  // const Eigen::Quaterniond q_heading(quaternionAtUnitZ(yaw(0)));
+  // const Eigen::Vector3d thrust_vec = acc - GVEC;
+  // const Eigen::Vector3d zB = thrust_vec.normalized();
+  // thrust = thrust_vec.norm();
+
+  // const Eigen::Quaterniond q_tilt = thrust > 1e-3 ? Eigen::Quaterniond::FromTwoVectors(Eigen::Vector3d::UnitZ(), thrust_vec) : q_tilt_last_;
+  // q_tilt_last_ = q_tilt;
+
+  // const Eigen::Quaterniond q_att = q_tilt * q_heading;
+
+  
+}

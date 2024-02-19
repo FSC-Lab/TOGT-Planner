@@ -1,0 +1,5 @@
+planning:  "standard_planning.yaml"
+
+lbfgs:     "standard_lbfgs.yaml"
+
+quadrotor: "standard_quad.yaml"

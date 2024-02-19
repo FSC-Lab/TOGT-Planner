@@ -1,0 +1,167 @@
+initState:
+  pos: [-5.0, 4.5, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+
+endState:
+  pos: [4.75, -0.9, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+
+orders: ['Gate1', 'Gate2', 'Gate3','Gate4', 'Gate5','Gate6','Gate7', 'Gate8', 'Gate9','Gate10', 'Gate11', 'Gate12', 'Gate13','Gate14', 'Gate15', 'Gate16','Gate17', 'Gate18', 'Gate19']
+
+Gate1:
+  type: 'SingleBall'
+  position: [-1.1, -1.6, 3.6]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+
+Gate2:
+  type: 'SingleBall'
+  position: [9.2, 6.6, 1.0]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate3:
+  type: 'SingleBall'
+  position: [9.2, -4.0, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+
+# Gate3:
+#   type: 'RectCorridor'
+#   position: [9.2, -4.0, 1.2]
+#   rpy: [0.0, -90, -90.0]
+#   width: 0.8
+#   height: 1.2
+#   marginW: 0.4
+#   marginH: 0.4
+#   length: 0.0
+#   midpoints: 0
+#   stationary: true
+
+Gate4:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 3.5]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate5:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 0.8]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate6:
+  type: 'SingleBall'
+  position: [4.75, -0.9, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate7:
+  type: 'SingleBall'
+  position: [-2.8, 6.8, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate8:
+  type: 'SingleBall'
+  position: [-1.1, -1.6, 3.6]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate9:
+  type: 'SingleBall'
+  position: [9.2, 6.6, 1.0]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate10:
+  type: 'SingleBall'
+  position: [9.2, -4.0, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate11:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 3.5]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate12:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 0.8]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate13:
+  type: 'SingleBall'
+  position: [4.75, -0.9, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+
+Gate14:
+  type: 'SingleBall'
+  position: [-2.8, 6.8, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate15:
+  type: 'SingleBall'
+  position: [-1.1, -1.6, 3.6]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate16:
+  type: 'SingleBall'
+  position: [9.2, 6.6, 1.0]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate17:
+  type: 'SingleBall'
+  position: [9.2, -4.0, 1.2]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate18:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 3.5]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+  
+Gate19:
+  type: 'SingleBall'
+  position: [-4.5, -6.0, 0.8]
+  radius: 0.3
+  margin: 0.0
+  stationary: true
+
+
+

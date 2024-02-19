@@ -1,0 +1,8 @@
+# Refine
+memorySize:         256
+past:               32
+minStep:            1.0e-32
+maxLinesearch:      64
+maxIterations:      0
+relCostTolerance:   1.0e-5
+relGradTolerance:   0.0

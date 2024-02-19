@@ -1,0 +1,7 @@
+memorySize:         256
+past:               3
+minStep:            1.0e-32
+maxLinesearch:      32
+maxIterations:      0
+relCostTolerance:   1.0e-5
+relGradTolerance:   1.0e-4
