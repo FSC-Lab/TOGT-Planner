@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(drolib)
 
-message(STATUS "==================   !DroLib!   ===================")
+message(STATUS "==================   TOGT Planner   ===================")
 
 ################################################################################
 #Options
@@ -189,7 +189,7 @@ else ()
       -Wall
       -Wextra
       -Wpedantic
-      # -Werror
+      -Werror
       -Wunused
       -Wno-unused-parameter
       -Wundef
@@ -214,8 +214,6 @@ else ()
     set(LIBRARY_NAME ${PROJECT_NAME})
 endif ()
 
-message(STATUS "LIBRARY_NAME is " ${LIBRARY_NAME})
-
 
 # Build tests
 if (BUILD_TESTS)
@@ -225,7 +223,7 @@ if (BUILD_TESTS)
       -Wall                   # Show all warnings
       -Wextra                 # Show extra error information
       -Wpedantic              # Issue all the warnings demanded by strict ISO C and ISO C++
-      # -Werror                 # Raise all warnings to errors
+      -Werror                 # Raise all warnings to errors
       -Wunused                # Warn whatever is assigned to, but unused
       -Wno-unused-parameter
       -Wundef                 # Warn if an undefined identifier is evaluated in an #if directive. 
@@ -247,6 +245,6 @@ if (BUILD_TESTS)
     add_test(tests tests)
 endif ()
 
-message(STATUS "===========   Done! Smells DroLib!   ==============")
+message(STATUS "===========   The TOGT Planner has been built successfully!   ==============")
 
 

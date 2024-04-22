@@ -1,6 +1,6 @@
 # Refine
 memorySize:         256
-past:               32
+past:               16
 minStep:            1.0e-32
 maxLinesearch:      64
 maxIterations:      0

@@ -119,6 +119,7 @@ class QuadState : public ParameterBase {
   void normalizeQ();
 
   bool operator==(const QuadState& rhs) const;
+  QuadState& operator=(const QuadState& other);
   bool isApprox(const QuadState& rhs, const double tol = 1e-6) const;
 
   inline bool operator<(const double time) const { return t < time; }

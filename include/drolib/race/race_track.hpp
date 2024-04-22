@@ -22,7 +22,7 @@ public:
   ~RaceTrack() = default;
 
   bool isChanged() const {
-    for (size_t i{0}; i < gates.size(); ++i) {
+    for (size_t i{0}; i < size_t(gates.size()); ++i) {
       if (gates[i]->isChanged()) {
         return true;
       }
@@ -31,7 +31,7 @@ public:
   }
 
   void clearChange() {
-    for (size_t i{0}; i < gates.size(); ++i) {
+    for (size_t i{0}; i < size_t(gates.size()); ++i) {
       gates[i]->clearChange();
     }
   }

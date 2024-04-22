@@ -1,5 +1,5 @@
 # Refine
-piecesPerSegment:   3
+piecesPerSegment:   5
 speedGuess:         1.0
 maxVelNorm:         60.0
 maxOmgXY:           15.0

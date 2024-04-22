@@ -12,3 +12,6 @@ build/*
 # Compile Commands
 */compile_commands.json
 */.clangd
+
+# Trajectory files
+**/.csv

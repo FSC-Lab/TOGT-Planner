@@ -147,10 +147,10 @@ double QuadManifold::computeRobustSimplePenalityCost(
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
 
 /*********Compute quadrotor full states*********/
-  double omg_xy_sqr{0.0}, omg_z_sqr{0.0}, thrust{0.0};
+  double omg_xy_sqr{0.0}, thrust{0.0};
 
-  Eigen::Vector3d pos = pvajs.col(0);
-  Eigen::Vector3d vel = pvajs.col(1);  
+  // Eigen::Vector3d pos = pvajs.col(0);
+  // Eigen::Vector3d vel = pvajs.col(1);  
   Eigen::Vector3d acc = pvajs.col(2);
   Eigen::Vector3d jer = pvajs.col(3);
   Eigen::Vector3d sna = pvajs.col(4);
@@ -166,7 +166,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
   s2 = sna(2);
   const double psi = yaw(0);
   const double dpsi = yaw(1);
-  const double ddpsi = yaw(2);
+  // const double ddpsi = yaw(2);
 
   c_half_psi = cos(0.5 * psi);
   s_half_psi = sin(0.5 * psi);
@@ -374,7 +374,7 @@ double QuadManifold::computeRobustPenalityCost(
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
 
 /*********Compute quadrotor full states*********/
-  double omg_xy_sqr{0.0}, omg_z_sqr{0.0}, thrust{0.0};
+  double omg_xy_sqr{0.0}, thrust{0.0};
   Eigen::Vector3d pos = pvajs.col(0);
   Eigen::Vector3d vel = pvajs.col(1);  
   Eigen::Vector3d acc = pvajs.col(2);

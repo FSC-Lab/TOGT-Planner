@@ -116,6 +116,26 @@ bool QuadState::operator==(const QuadState& rhs) const {
   return t == rhs.t && x.isApprox(rhs.x);
 }
 
+QuadState& QuadState::operator=(const QuadState& other) {
+  // Guard self assignment
+  if (this == &other)
+    return *this;
+
+  // assume *this manages a reusable resource, such as a heap-allocated buffer mArray
+  // if (size != other.size) {
+  //     temp = new int[other.size];   // allocate resource, if throws, do nothing
+  //     delete[] mArray;              // release resource in *this
+  //     mArray = temp;
+  //     size = other.size;
+  // } 
+
+  // std::copy(other.mArray, other.mArray + other.size, mArray);
+
+  this->x = other.x;
+  this->t = other.t;
+  return *this;
+}
+
 bool QuadState::isApprox(const QuadState& rhs, const double tol) const {
   return std::abs(t - rhs.t) < tol && x.isApprox(rhs.x, tol);
 }

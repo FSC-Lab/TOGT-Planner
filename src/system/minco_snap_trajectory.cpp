@@ -124,31 +124,12 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
     return false;
   }
 
-
-  // std::cout << "saveTimestamps" << std::endl;
-  // const double T = polys.getTotalDuration();
-  // std::cout << "T: " << T << std::endl;
-
-  // const int N = polys.getPieceNum();
-  // std::cout << "N: " << N << std::endl;
-
   Eigen::VectorXd durations = polys.getDurations();
   Eigen::Matrix3Xd points = polys.getPoints();
   std::vector<double> timestamps;
-  // std::cout << "durations: " << durations << std::endl;
-
-  // std::cout << "points: " << points << std::endl;
-  // std::cout << "points.cols(): " << points.cols() << std::endl;
-
-
-  // std::vector<double> vecT;
-  // for (int i=0; i < durations.size(); ++i) {
-  //   vecT.push_back(durations[i]);
-  // }
-  // std::cout << "Timestamps:" << std::endl;
 
   timestamps.push_back(0.0);
-  for (int i=0; i < durations.size(); ++i) {
+  for (size_t i=0; i < size_t(durations.size()); ++i) {
     timestamps.push_back(timestamps.back() + durations[i]);
   }
 
@@ -163,7 +144,7 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
   file.precision(4);
 
   file << "timestamps: [";
-  for (int i{0}; i < timestamps.size(); ++i) {
+  for (size_t i{0}; i < size_t(timestamps.size()); ++i) {
     if (i < timestamps.size() - 1) {
       file << timestamps[i] << ",\n            ";
     } else {
@@ -173,8 +154,8 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
   file << "]\n\n";
   
   file << "waypoints: [";
-  for (int i{0}; i < points.cols(); ++i) {
-    if (i < points.cols() - 1) {
+  for (size_t i{0}; i < size_t(points.cols()); ++i) {
+    if (i < size_t(points.cols() - 1)) {
       file << "[" << points.col(i).x() << ", "
                   << points.col(i).y() << ", " 
                   << points.col(i).z() << "],\n            ";
@@ -202,7 +183,7 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
   Eigen::Matrix3Xd points = polys.getPoints();
 
   const double nPieces = durations.size();
-  const double nSegments = nPieces / piecesPerSegment;
+  const int nSegments = std::floor(nPieces / piecesPerSegment);
 
   Eigen::VectorXd raceDurations;
   Eigen::Matrix3Xd raceWaypoints;
@@ -238,8 +219,8 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
   file << "sampled_dt: " << dt << "\n\n";
 
   file << "waypoints: [";
-  for (int i{0}; i < raceWaypoints.cols(); ++i) {
-    if (i < raceWaypoints.cols() - 1) {
+  for (size_t i{0}; i < size_t(raceWaypoints.cols()); ++i) {
+    if (i < size_t(raceWaypoints.cols() - 1)) {
       file << "[" << raceWaypoints.col(i).x() << ", "
                   << raceWaypoints.col(i).y() << ", " 
                   << raceWaypoints.col(i).z() << "],\n            ";
@@ -252,8 +233,8 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
   file << "]\n\n";
 
   file << "durations: [";
-  for (int i{0}; i < raceDurations.size(); ++i) {
-    if (i < raceDurations.size() - 1) {
+  for (size_t i{0}; i < size_t(raceDurations.size()); ++i) {
+    if (i < size_t(raceDurations.size() - 1)) {
       file << raceDurations[i] << ",\n            ";
     } else {
       file << raceDurations[i];

@@ -18,7 +18,7 @@ int RaceTrack::totalWaypoints() const {
   int sum{0};
   for (size_t i{0}; i < corridors.size(); ++i) {
     sum += corridors[i]->size();
-    if (i < gates.size()) {
+    if (i < size_t(gates.size())) {
       sum += gates[i]->size();
     }
   }
@@ -28,13 +28,13 @@ int RaceTrack::totalWaypoints() const {
 void RaceTrack::updateWaypoints(const TrajData &tdata) {
   assert(totalWaypoints() == tdata.totalPieces);
   int idx{0};
-  for (size_t i{0}; i < corridors.size(); ++i) {
+  for (size_t i{0}; i < size_t(corridors.size()); ++i) {
     for (auto &wp : corridors[i]->corridor) {
       wp.point = tdata.P.col(idx);
       idx++;
     }
 
-    if (i < gates.size()) {
+    if (i < size_t(gates.size())) {
       for (auto &wp : gates[i]->corridor) {
         wp.point = tdata.P.col(idx);
         idx++;
@@ -45,11 +45,11 @@ void RaceTrack::updateWaypoints(const TrajData &tdata) {
 
 std::vector<Eigen::Vector3d> RaceTrack::getWaypoints() const {
   std::vector<Eigen::Vector3d> waypoints;
-  for (size_t i{0}; i < corridors.size(); ++i) {
+  for (size_t i{0}; i < size_t(corridors.size()); ++i) {
     for (const auto &wp : corridors[i]->corridor) {
       waypoints.push_back(wp.point);
     }
-    if (i < gates.size()) {
+    if (i < size_t(gates.size())) {
       for (const auto &wp : gates[i]->corridor) {
         waypoints.push_back(wp.point);
       }
@@ -60,7 +60,7 @@ std::vector<Eigen::Vector3d> RaceTrack::getWaypoints() const {
 
 std::vector<Eigen::Vector3d> RaceTrack::getGatepoints() const {
   std::vector<Eigen::Vector3d> gatepoints;
-  for (int i{0}; i < gates.size(); ++i) {
+  for (size_t i{0}; i < size_t(gates.size()); ++i) {
     if (gates[i]->corridor.size() == 1) {
       gatepoints.push_back(gates[i]->corridor.front().point);
     } else {
@@ -97,7 +97,7 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
       // corridors[i]->corridor[j].point = segment.getPos(t);
     }
 
-    if (i < gates.size()) {
+    if (i < size_t(gates.size())) {
       if (gates[i]->size() == 1) {
         t += duration;
         cur.P.col(pointIdx++) = segment.getPos(t);
@@ -142,7 +142,7 @@ void RaceTrack::assignWaypoints(TrajData &tdata) {
     segments.emplace_back(idx, corridors[i]->size() + 1);
     idx += corridors[i]->size() + 1;
 
-    if (i < gates.size()) {
+    if (i < size_t(gates.size())) {
       tdata.append(gates[i]->corridor);
 
       if (gates[i]->size() >= 2) {
@@ -184,14 +184,14 @@ void RaceTrack::save(const std::string &filename) {
   endState.write("endState", file);
   file.precision(2);
   file << "orders: [";
-  for (size_t i{0}; i < gates.size(); ++i) {
-    if (i < gates.size() - 1) {
+  for (size_t i{0}; i < size_t(gates.size()); ++i) {
+    if (i < size_t(gates.size()) - 1) {
       file << "'" << gates[i]->order << "', ";
     } else {
       file << "'" << gates[i]->order << "']\n\n";
     }
   }
-  for (size_t i{0}; i < gates.size(); ++i) {
+  for (size_t i{0}; i < size_t(gates.size()); ++i) {
     // file << (*gates[i]);
     gates[i]->write(file);
   }

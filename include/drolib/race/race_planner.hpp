@@ -12,7 +12,6 @@
 #include "drolib/utils/timer.hpp"
 
 namespace drolib {
-
 class RacePlanner {
 public:
   RacePlanner() = default;
@@ -24,7 +23,6 @@ public:
   bool planTOGT(std::shared_ptr<RaceTrack> track);
   MincoSnapTrajectory getTrajectory(void) { return trajectory_; }
   TrajExtremum getExtremum(void) { return extremum_; }
-  TrajData getSolution(void) { return solver_.data; }
 
 private:
   Timer timerPlanning_{"Planning"};

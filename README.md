@@ -39,7 +39,8 @@ make
 
 ```
 cd ../resources/trajectory
-python3 plot_traj.py
+python3 plot_togt_traj.py
+python3 plot_aos_traj.py
 ```
 
 

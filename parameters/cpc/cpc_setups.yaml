@@ -5,7 +5,4 @@ lbfgsInit:     "init/cpc_lbfgs.yaml"
 planningRefine: "refine/cpc_planning.yaml"
 lbfgsRefine:     "refine/cpc_lbfgs.yaml"
 
-planningReplan: "replan/cpc_planning.yaml"
-lbfgsReplan:     "replan/cpc_lbfgs.yaml"
-
 quadrotor: "cpc_quad.yaml"
