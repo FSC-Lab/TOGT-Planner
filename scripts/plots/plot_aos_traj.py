@@ -4,7 +4,12 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import UnivariateSpline
 
 import sys, os
-directory = os.getcwd()
+BASEPATH = os.path.abspath(__file__).split("plots/", 1)[0]+"plots/"
+ROOTPATH = os.path.abspath(__file__).split("plots/", 1)[0]+".."
+sys.path += [BASEPATH]
+sys.path += [ROOTPATH]
+
+directory = ROOTPATH + "/resources/trajectory"
 
 traj_file = directory + "/aos_traj.csv"
 
@@ -98,5 +103,6 @@ plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.axis('equal')
 plt.grid()
+plt.savefig('aos_traj.png')
 
 plt.show()

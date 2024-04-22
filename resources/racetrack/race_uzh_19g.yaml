@@ -1,0 +1,249 @@
+initState:
+  pos: [-5.0, 4.5, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+
+endState:
+  pos: [4.75, -0.9, 1.2]
+  vel: [0.0, 0.0, 0.0]
+  acc: [0.0, 0.0, 0.0]
+  jer: [0.0, 0.0, 0.0]
+  cthrustmass: 9.8066
+  euler: [0.0, 0.0, 0.0]
+  rot: [1.0, 0.0, 0.0, 0.0]
+
+orders: ['Gate1', 'Gate2', 'Gate3','Gate4', 'Gate5','Gate6','Gate7', 'Gate8', 'Gate9','Gate10', 'Gate11', 'Gate12', 'Gate13','Gate14', 'Gate15', 'Gate16','Gate17', 'Gate18', 'Gate19']
+
+Gate1:
+  type: 'RectanglePrisma'
+  position: [-1.1, -1.6, 3.6]
+  rpy: [0.0, -90, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate2:
+  type: 'RectanglePrisma'
+  position: [9.2, 6.6, 1.0]
+  rpy: [0.0, -90.0, -20.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate3:
+  type: 'RectanglePrisma'
+  position: [9.2, -4.0, 1.2]
+  rpy: [0.0, -90, -130.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate4:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 3.5]
+  rpy: [0.0, -90.0, 180.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate5:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 0.8]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate6:
+  type: 'RectanglePrisma'
+  position: [4.75, -0.9, 1.2]
+  rpy: [0.0, -90.0, 70.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate7:
+  type: 'RectanglePrisma'
+  position: [-2.8, 6.8, 1.2]
+  rpy: [0.0, -90.0, 200.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate8:
+  type: 'RectanglePrisma'
+  position: [-1.1, -1.6, 3.6]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+  
+Gate9:
+  type: 'RectanglePrisma'
+  position: [9.2, 6.6, 1.0]
+  rpy: [0.0, -90.0, -20.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+  
+Gate10:
+  type: 'RectanglePrisma'
+  position: [9.2, -4.0, 1.2]
+  rpy: [0.0, -90.0, -130.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate11:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 3.5]
+  rpy: [0.0, -90.0, 180.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+  
+Gate12:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 0.8]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate13:
+  type: 'RectanglePrisma'
+  position: [4.75, -0.9, 1.2]
+  rpy: [0.0, -90.0, 70.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate14:
+  type: 'RectanglePrisma'
+  position: [-2.8, 6.8, 1.2]
+  rpy: [0.0, -90.0, 200.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate15:
+  type: 'RectanglePrisma'
+  position: [-1.1, -1.6, 3.6]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+  
+Gate16:
+  type: 'RectanglePrisma'
+  position: [9.2, 6.6, 1.0]
+  rpy: [0.0, -90.0, -20.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate17:
+  type: 'RectanglePrisma'
+  position: [9.2, -4.0, 1.2]
+  rpy: [0.0, -90.0, -130.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate18:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 3.5]
+  rpy: [0.0, -90.0, 180.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+Gate19:
+  type: 'RectanglePrisma'
+  position: [-4.5, -6.0, 0.8]
+  rpy: [0.0, -90.0, 0.0]
+  width: 2.4
+  height: 2.4
+  marginW: 0.8
+  marginH: 0.8
+  length: 0.0
+  midpoints: 0
+  stationary: true
+
+

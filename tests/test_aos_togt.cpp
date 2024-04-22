@@ -5,20 +5,20 @@
 #include <filesystem>
 using namespace drolib;
 
-class AosTest : public ::testing::Test {
+class AosTogtTest : public ::testing::Test {
  protected:
   std::shared_ptr<RaceTrack> racetrack;
   std::shared_ptr<RacePlanner> raceplanner;
   std::shared_ptr<RaceParams> raceparams;
   const std::string quad_name = "cpc";
   const std::string config_name = quad_name + "_setups.yaml";
-  const std::string track_name = "race_uzh_19wp.yaml";
-  const std::string traj_name ="aos_traj.csv";
-  const std::string wpt_name ="aos_wpt.yaml";
+  const std::string track_name = "race_uzh_19g.yaml";
+  const std::string traj_name ="aos_togt_traj.csv";
+  const std::string wpt_name ="aos_togt_wpt.yaml";
 
 };
 
-TEST_F(AosTest, planTraj) {
+TEST_F(AosTogtTest, planTraj) {
   fs::path cwd = std::filesystem::current_path();
   fs::path config_path = cwd / ".." / "parameters" / quad_name;
   fs::path track_path = cwd / ".." / "resources/racetrack" / track_name;

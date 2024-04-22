@@ -119,7 +119,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   return extremum;
 }
 
-bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
+bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
   if (!polys.valid()) {
     return false;
   }
@@ -132,12 +132,6 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
   for (size_t i=0; i < size_t(durations.size()); ++i) {
     timestamps.push_back(timestamps.back() + durations[i]);
   }
-
-  // std::partial_sum(vecT.begin(), vecT.end(), timestamps.begin(), std::plus<double>());
-  // for (auto time : timestamps) {
-  //   std::cout << time << std::endl;
-  // }
-
 
   std::ofstream file;
   file.open(filename.c_str());
@@ -175,7 +169,7 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
 }
 
 
-bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const double dt, const int piecesPerSegment) {
+bool MincoSnapTrajectory::saveSegments(const std::string &filename, const int piecesPerSegment) {
   if (!polys.valid()) {
     return false;
   }
@@ -183,7 +177,7 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
   Eigen::Matrix3Xd points = polys.getPoints();
 
   const double nPieces = durations.size();
-  const int nSegments = std::floor(nPieces / piecesPerSegment);
+  const int nSegments = static_cast<int>(nPieces / piecesPerSegment);
 
   Eigen::VectorXd raceDurations;
   Eigen::Matrix3Xd raceWaypoints;
@@ -206,17 +200,18 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
       raceWaypoints.col(i) = pos;
     }
   }
-  // std::cout << "totalDuration: \n" << raceDurations.sum() << std::endl;
-  // std::cout << "point number: \n" << raceWaypoints.size() << std::endl;
 
-  // std::cout << "raceDurations: \n" << raceDurations.transpose() << std::endl;
-  // std::cout << "raceWaypoints: \n" << raceWaypoints.transpose() << std::endl;
+  std::vector<double> timestamps;
 
-  //TODO: save yaml files
+  timestamps.push_back(0.0);
+  for (size_t i=0; i < size_t(raceDurations.size()); ++i) {
+    timestamps.push_back(timestamps.back() + raceDurations[i]);
+  }
+
   std::ofstream file;
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
   file.open(filename.c_str());
   file.precision(4);
-  file << "sampled_dt: " << dt << "\n\n";
 
   file << "waypoints: [";
   for (size_t i{0}; i < size_t(raceWaypoints.cols()); ++i) {
@@ -228,6 +223,16 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
       file << "[" << raceWaypoints.col(i).x() << ", "
                   << raceWaypoints.col(i).y() << ", " 
                   << raceWaypoints.col(i).z() << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "timestamps: [";
+  for (size_t i{0}; i < size_t(timestamps.size()); ++i) {
+    if (i < size_t(timestamps.size() - 1)) {
+      file << timestamps[i] << ",\n            ";
+    } else {
+      file << timestamps[i];
     }
   }
   file << "]\n\n";

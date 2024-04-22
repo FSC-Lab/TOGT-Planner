@@ -15,3 +15,6 @@ build/*
 
 # Trajectory files
 **/.csv
+
+# Python cache
+**/.pyc

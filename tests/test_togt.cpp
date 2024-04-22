@@ -16,6 +16,7 @@ class TrajPlannerTest : public ::testing::Test {
   // const std::string track_name = "race_uzh_19wp.yaml";
 
   const std::string traj_name ="togt_traj.csv";
+  const std::string wpt_name ="togt_wpt.yaml";
 };
 
 TEST_F(TrajPlannerTest, planTraj) {
@@ -23,6 +24,7 @@ TEST_F(TrajPlannerTest, planTraj) {
   fs::path config_path = cwd / ".." / "parameters" / quad_name;
   fs::path track_path = cwd / ".." / "resources/racetrack" / track_name;
   fs::path traj_path = cwd / ".." / "resources/trajectory" / traj_name;
+  fs::path wpt_path = cwd / ".." / "resources/trajectory" / wpt_name;
 
   raceparams = std::make_shared<RaceParams>(config_path, config_name);
   raceplanner = std::make_shared<RacePlanner>(*raceparams);
@@ -35,5 +37,6 @@ TEST_F(TrajPlannerTest, planTraj) {
 
   MincoSnapTrajectory traj = raceplanner->getTrajectory();
   traj.save(traj_path);  
+  traj.saveSegments(wpt_path, 1);
 }
 
