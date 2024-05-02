@@ -64,7 +64,7 @@ b = 0.0 * (1-vt) + 0.0 * vt
 rgb = np.array([r, g, b]).T
 
 plt.scatter(ps[:, 0], ps[:, 1], s=5,
-            c=vt, cmap=plt.cm.autumn.reversed())
+            c=vt, cmap=plt.cm.summer.reversed())
 plt.colorbar(pad=0.0).ax.set_ylabel('Speed [m/s]')
 
 # Plot gates

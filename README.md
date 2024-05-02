@@ -60,7 +60,7 @@ python3 plot_togt_refined_traj.py
 
 ## Visualize the AOS trajectory for waypoint flight
 
-Another example is the Split-S track provided in [this](https://www.science.org/doi/full/10.1126/scirobotics.abh1221) paper. It consists of 19 waypoints in total with a tolerance of 0.3 m for each point. Below is our generated trajectory. The AOS stands for automatic optimal synthesis, a novel framework to address time-optimal planning problem. It is part of the result from the second reference above. It takes around 6 seconds to solve the minimum-time trajectory that originally requires ~50 minutes in previous methods. The resulting lap time is only 1~2% longer than the optimal solution. We will provide in-depth analytical analysis in the paper about its distance-insensitive nature. The resulting lap time is `17.93` s where the true optimal is `17.56` s.
+Another example is the Split-S track provided in [this](https://www.science.org/doi/full/10.1126/scirobotics.abh1221) paper. It consists of 19 waypoints in total with a tolerance of 0.3 m for each point. Below is our generated trajectory. The AOS stands for automatic optimal synthesis, a novel framework to address time-optimal planning problem. It is part of the result from the second reference above. It takes around 6 s to solve the minimum-time trajectory that originally requires \~50 minutes in previous methods. The resulting lap time is only 1\~2% longer than the optimal solution. We will provide in-depth analytical analysis in the paper about its distance-insensitive nature. The resulting lap time is `17.93` s while the true optimal is `17.56` s.
 
 
 ```
