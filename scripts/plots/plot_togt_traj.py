@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
+from track import plot_track
 
 import sys, os
 BASEPATH = os.path.abspath(__file__).split("plots/", 1)[0]+"plots/"
@@ -9,9 +9,8 @@ ROOTPATH = os.path.abspath(__file__).split("plots/", 1)[0]+".."
 sys.path += [BASEPATH]
 sys.path += [ROOTPATH]
 
-directory = ROOTPATH + "/resources/trajectory"
-
-traj_file = directory + "/togt_traj.csv"
+track_file = ROOTPATH + "/resources/racetrack/race_uzh_7g_multiprisma.yaml"
+traj_file = ROOTPATH + "/resources/trajectory/togt_traj.csv"
 
 data_ocp = np.genfromtxt(traj_file, dtype=float, delimiter=',', names=True)
 
@@ -65,12 +64,14 @@ rgb = np.array([r, g, b]).T
 
 plt.scatter(ps[:, 0], ps[:, 1], s=5,
             c=vt, cmap=plt.cm.winter.reversed())
-plt.colorbar(pad=0.0).ax.set_ylabel('Speed [m/s]')
+plt.colorbar(pad=0.01).ax.set_ylabel('Speed [m/s]')
+
+plot_track(plt.gca(), track_file)
 
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.axis('equal')
 plt.grid()
-plt.savefig('togt_traj.png')
+plt.savefig('togt_traj.png', bbox_inches='tight')
 
 plt.show()
