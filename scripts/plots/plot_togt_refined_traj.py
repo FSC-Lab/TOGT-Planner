@@ -10,7 +10,7 @@ sys.path += [BASEPATH]
 sys.path += [ROOTPATH]
 
 track_file = ROOTPATH + "/resources/racetrack/race_uzh_7g_multiprisma.yaml"
-traj_file = ROOTPATH + "/resources/trajectory/togt_traj.csv"
+traj_file = ROOTPATH + "/resources/trajectory/togt_refined_traj.csv"
 
 data_ocp = np.genfromtxt(traj_file, dtype=float, delimiter=',', names=True)
 

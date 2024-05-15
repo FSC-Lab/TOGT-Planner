@@ -55,7 +55,7 @@ python3 togt_refine.py
 cd ../plots
 python3 plot_togt_refined_traj.py
 ```
-![Alt Text](documents/images/togt_refined_traj.png)
+![Alt Text](documents/images/fig_togt_refined_traj.png)
 
 ## Visualize the AOS trajectory for waypoint flight
 
@@ -66,7 +66,7 @@ Another example is the Split-S track provided in [this](https://www.science.org/
 cd ../scripts/plots
 python3 plot_aos_traj.py
 ```
-![Alt Text](documents/images/aos_traj.png)
+![Alt Text](documents/images/fig_aos_traj.png)
 
 ## Visualize the AOS-TOGT trajectory
 
@@ -77,7 +77,7 @@ cd ../scripts/plots
 python3 plot_aos_togt_traj.py
 ```
 
-![Alt Text](documents/images/aos_togt_traj.png)
+![Alt Text](documents/images/fig_aos_togt_traj.png)
 
 ## Acknowledgements
 

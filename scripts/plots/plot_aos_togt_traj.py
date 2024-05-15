@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from track import plot_track
+from scipy.interpolate import UnivariateSpline
 
 import sys, os
 BASEPATH = os.path.abspath(__file__).split("plots/", 1)[0]+"plots/"
@@ -9,8 +9,9 @@ ROOTPATH = os.path.abspath(__file__).split("plots/", 1)[0]+".."
 sys.path += [BASEPATH]
 sys.path += [ROOTPATH]
 
-track_file = ROOTPATH + "/resources/racetrack/race_uzh_7g_multiprisma.yaml"
-traj_file = ROOTPATH + "/resources/trajectory/togt_traj.csv"
+directory = ROOTPATH + "/resources/trajectory"
+
+traj_file = directory + "/aos_togt_traj.csv"
 
 data_ocp = np.genfromtxt(traj_file, dtype=float, delimiter=',', names=True)
 
@@ -64,15 +65,44 @@ rgb = np.array([r, g, b]).T
 
 plt.scatter(ps[:, 0], ps[:, 1], s=5,
             c=vt, cmap=plt.cm.summer.reversed())
-plt.colorbar(pad=0.01).ax.set_ylabel('Speed [m/s]')
+plt.colorbar(pad=0.0).ax.set_ylabel('Speed [m/s]')
 
-plot_track(plt.gca(), track_file)
+# Plot gates
+
+orientations = {
+    'Gate1': [0.0, -90.0, -0.0],
+    'Gate2': [0.0, -90.0, -20.0],
+    'Gate3': [0.0, -90.0, 50.0],
+    'Gate4': [0.0, -90.0, 0.0],
+    'Gate5': [0.0, -90.0, 0.0],
+    'Gate6': [0.0, -90.0, 70.0],
+    'Gate7': [0.0, -90.0, 20.0]
+}
+    
+positions = {
+    'Gate1': (-1.1, -1.6, 3.6),
+    'Gate2': (9.2, 6.6, 1.0),
+    'Gate3': (9.2, -4.0, 1.2),
+    'Gate4': (-4.5, -6.0, 3.5),
+    'Gate5': (-4.5, -6.0, 0.8),
+    'Gate6': [4.75, -0.9, 1.2],
+    'Gate7': [-2.8, 6.8, 1.2]
+}
+
+
+orders = ['Gate1', 'Gate2', 'Gate3', 'Gate4', 'Gate5', 'Gate6', 'Gate7']
+for g in orders:
+    rpy = np.array(orientations[g]) * np.pi/180
+    y = rpy[2]
+    r = 0.8
+    plt.plot([positions[g][0]+r*np.sin(y), positions[g][0]-r*np.sin(y)],
+            [positions[g][1]-r*np.cos(y), positions[g][1]+r*np.cos(y)], 'k-', linewidth=4.0)
 
 
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.axis('equal')
 plt.grid()
-plt.savefig('aos_togt_traj.png', bbox_inches='tight')
+plt.savefig('aos_togt_traj.png')
 
 plt.show()
