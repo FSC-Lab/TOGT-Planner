@@ -12,8 +12,10 @@ If the TOGT planner helps your academic projects, please cite our papers. Thank 
 
 ## Updates:
 
+- **May. 30, 2024** - Create the tutorial
 - **May. 2, 2024** - Add three different variances of the TOGT planner and make the project public
 - **Feb. 19, 2024** - First version released
+
 
 ## Install on Ubuntu
 
