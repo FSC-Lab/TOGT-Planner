@@ -20,11 +20,11 @@ class TrajPlannerTest : public ::testing::Test {
 };
 
 TEST_F(TrajPlannerTest, planTraj) {
-  fs::path cwd = std::filesystem::current_path();
-  fs::path config_path = cwd / ".." / "parameters" / quad_name;
-  fs::path track_path = cwd / ".." / "resources/racetrack" / track_name;
-  fs::path traj_path = cwd / ".." / "resources/trajectory" / traj_name;
-  fs::path wpt_path = cwd / ".." / "resources/trajectory" / wpt_name;
+  fs::path root(PROJECT_ROOT);
+  fs::path config_path = root / "parameters" / quad_name;
+  fs::path track_path = root / "resources/racetrack" / track_name;
+  fs::path traj_path = root / "resources/trajectory" / traj_name;
+  fs::path wpt_path = root / "resources/trajectory" / wpt_name;
 
   raceparams = std::make_shared<RaceParams>(config_path, config_name);
   raceplanner = std::make_shared<RacePlanner>(*raceparams);
@@ -36,7 +36,7 @@ TEST_F(TrajPlannerTest, planTraj) {
   std::cout << extremum << std::endl;
 
   MincoSnapTrajectory traj = raceplanner->getTrajectory();
-  traj.save(traj_path);  
+  traj.save(traj_path);
   traj.saveSegments(wpt_path, 1);
 }
 
