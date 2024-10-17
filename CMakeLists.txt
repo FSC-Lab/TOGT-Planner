@@ -1,10 +1,24 @@
 cmake_minimum_required(VERSION 3.25.0)
 project(drolib)
 
+option(
+  TOGT_FORCE_SCALAR_FIRST_QUATERNION
+  "Forces quaternions to be exported real-FIRST, in contravention to Eigen's internal data layout"
+  OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Eigen3 3.3.4 REQUIRED)
 
+include(FetchContent)
+
+FetchContent_Declare(
+  RapidJSON
+  GIT_REPOSITORY "https://github.com/Tencent/rapidjson.git"
+  GIT_TAG "master"
+  GIT_SHALLOW "TRUE"
+  SYSTEM FIND_PACKAGE_ARGS "NAMES;RapidJSON;CONFIG;1.1.0")
+
+FetchContent_MakeAvailable(RapidJSON)
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1048576)
 
 add_library(${PROJECT_NAME})
@@ -93,7 +107,15 @@ target_sources(
           src/utils/logger.cpp
           src/utils/timer.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen)
+if(TOGT_FORCE_SCALAR_FIRST_QUATERNION)
+  target_compile_definitions(${PROJECT_NAME}
+                             PRIVATE TOGT_FORCE_SCALAR_FIRST_QUATERNION)
+endif(TOGT_FORCE_SCALAR_FIRST_QUATERNION)
+
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC Eigen3::Eigen
+  PRIVATE "$<COMPILE_ONLY:rapidjson>")
 
 include(CTest)
 if(BUILD_TESTING)

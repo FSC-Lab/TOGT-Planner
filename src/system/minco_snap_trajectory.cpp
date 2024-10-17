@@ -1,4 +1,9 @@
 #include "drolib/system/minco_snap_trajectory.hpp"
+#include "drolib/type/set_point.hpp"
+#include "rapidjson/rapidjson.h"
+#include "rapidjson/document.h"
+#include "rapidjson/filewritestream.h"
+#include "rapidjson/writer.h"
 
 namespace drolib {
 
@@ -253,15 +258,10 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename, const int pi
   return true;
 }
 
-bool MincoSnapTrajectory::save(const std::string &filename) {
-  if (!valid() || setpoints.empty()) {
-    return false;
-  }
+namespace details {
 
-  if (!setpoints.front().input.isSingleRotorThrusts()) {
-    return false;
-  }
-
+void writeCSV(const std::filesystem::path& filename,
+              const SetpointVector& setpoints) {
   std::ofstream file;
   file.open(filename.c_str());
   file << "t,p_x,p_y,p_z,q_w,q_x,q_y,q_z,v_x,v_y,v_z,w_x,w_y,w_z,"
@@ -289,8 +289,72 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
          << jer(0) << "," << jer(1) << "," << jer(2) << "," << sna(0) << ","
          << sna(1) << "," << sna(2) << "\n";
   }
-
   file.close();
+}
+
+rapidjson::Value ToJson(const Eigen::Ref<const Eigen::VectorXd>& v,
+                             rapidjson::MemoryPoolAllocator<>& alloc) {
+  rapidjson::Value res(rapidjson::kArrayType);
+  for (int i = 0; i < v.size(); ++i) {
+    res.PushBack(v.coeff(i), alloc);
+  }
+  return res;
+}
+
+void writeJSON(const std::filesystem::path& filepath,
+               const SetpointVector& setpoints) {
+  rapidjson::Document doc;
+
+  doc.SetArray();
+  auto& alloc = doc.GetAllocator();
+  doc.Reserve(static_cast<rapidjson::SizeType>(setpoints.size()), alloc);
+  for (const auto& setpoint : setpoints) {
+    const double& t = setpoint.state.t;
+    rapidjson::Value item(rapidjson::kObjectType);
+    item.AddMember("t", t, alloc)
+        .AddMember("p", ToJson(setpoint.state.p, alloc), alloc)
+        .AddMember("v", ToJson(setpoint.state.v, alloc), alloc)
+        .AddMember("a_lin", ToJson(setpoint.state.a, alloc), alloc)
+        .AddMember("jerk", ToJson(setpoint.state.j, alloc), alloc)
+        .AddMember("snap", ToJson(setpoint.state.s, alloc), alloc)
+        .AddMember("q", ToJson(setpoint.state.qx, alloc), alloc)
+        .AddMember("w", ToJson(setpoint.input.omega, alloc), alloc)
+        .AddMember("u", ToJson(setpoint.input.thrusts, alloc), alloc);
+    doc.PushBack(item, alloc);
+  }
+
+  struct FCloseWrapper {
+    void operator()(FILE* fp) { std::fclose(fp); }
+  };
+  std::unique_ptr<FILE, FCloseWrapper> fp{std::fopen(filepath.c_str(), "w"),
+                                          FCloseWrapper()};
+  char buf[(1 << 16) - 1];
+  rapidjson::FileWriteStream os{fp.get(), buf, sizeof buf};
+  rapidjson::Writer ws(os);
+  ws.SetMaxDecimalPlaces(5);
+  doc.Accept(ws);
+}
+}  // namespace details
+
+bool MincoSnapTrajectory::save(const std::string& filename) {
+  if (!valid() || setpoints.empty()) {
+    return false;
+  }
+
+  if (!setpoints.front().input.isSingleRotorThrusts()) {
+    return false;
+  }
+
+  std::filesystem::path filepath(filename);
+
+  if (filepath.extension() == ".csv") {
+    details::writeCSV(filepath, setpoints);
+  } else if (filepath.extension() == ".json") {
+    details::writeJSON(filepath, setpoints);
+  } else {
+    return false;
+  }
+
   return true;
 }
 

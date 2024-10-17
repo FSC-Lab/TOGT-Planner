@@ -935,11 +935,18 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   tilt1 = -zB1 / tilt_den;
   tilt2 = zB0 / tilt_den;
   // q_tilt_last_ = Eigen::Quaterniond(tilt0, tilt1, tilt2, 0.0);
-  
-  quat(0) = tilt0 * c_half_psi;
-  quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
-  quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
-  quat(3) = tilt0 * s_half_psi;
+#ifdef TOGT_FORCE_SCALAR_FIRST_QUATERNION
+  quat << tilt0 * c_half_psi,                   //
+      tilt1 * c_half_psi + tilt2 * s_half_psi,  //
+      tilt2 * c_half_psi - tilt1 * s_half_psi,  //
+      tilt0 * s_half_psi;
+#else
+  quat << tilt1 * c_half_psi + tilt2 * s_half_psi,  //
+      tilt2 * c_half_psi - tilt1 * s_half_psi,      //
+      tilt0 * s_half_psi,                           //
+      tilt0 * c_half_psi;
+
+#endif
 
   // bodyrate
   omg_den = zB2_1;
