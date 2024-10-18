@@ -8,7 +8,7 @@ If the TOGT planner helps your academic projects, please cite our papers. Thank 
 
 - **Time-Optimal Gate-Traversing Planner for Autonomous Drone Racing**, Chao Qin, Maxime SJ Michet, Jingxiang Chen, and Hugh H.-T. Liu,  IEEE International Conference on Robotics and Automation (ICRA-2024)
 
-- **Time-Optimal Planning for Quadrotors: Reaching Constant Computation Costs for Arbitrary Distance**, Chao Qin, Jingxiang Chen, Yifan Lin, Abhishek Goudar, and Hugh H.-T. Liu, (On-going)
+- **Time-Optimal Planning for Long-Range Quadrotor Flights: An Automatic Optimal Synthesis Approach**, Chao Qin, Jingxiang Chen, Yifan Lin, Abhishek Goudar, Angela P. Schoellig, and Hugh H.-T. Liu, arXiv:2407.17944
 
 ## Updates:
 
