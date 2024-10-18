@@ -14,7 +14,6 @@
 namespace drolib {
 class RaceTrack : public ParameterBase {
 public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   explicit RaceTrack(const fs::path &filename);
   RaceTrack(const QuadState &init, const QuadState &end);

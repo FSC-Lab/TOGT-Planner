@@ -23,7 +23,6 @@ enum class Shape : unsigned char {
 
 class ShapeBase {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   static constexpr int DIM3 = 3; 
   ShapeBase() = default;
   virtual ~ShapeBase() {}

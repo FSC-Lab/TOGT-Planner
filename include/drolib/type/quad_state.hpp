@@ -10,7 +10,6 @@ namespace drolib {
 
 class QuadState : public ParameterBase {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   enum IDX : int {
     POS = 0,

@@ -1,250 +1,124 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.25.0)
 project(drolib)
 
-message(STATUS "==================   TOGT Planner   ===================")
-
-################################################################################
-#Options
-################################################################################
-
-option(BUILD_TESTS "Building the tests" ON)
-option(ENABLE_FAST "Build with optimizations for speed" ON)
-option(UNSAFE_MATH "Build with -funsafe-math-optimizations: high impact on speed, but lowers floating point precision." ON)
-option(ENABLE_PROFILING "Build for profiling" OFF)
-option(ENABLE_PARALLEL "Build using openmp parallelization" OFF)
-option(EIGEN_FROM_SYSTEM "Use the system-provided Eigen" ON)
-option(DEBUG_LOGGING "Enable detailed logging" OFF)
-set(
-        EIGEN_ALTERNATIVE "" CACHE STRING
-        "Path to alternative Eigen, autodownload if blank"
-)
+option(
+  TOGT_FORCE_SCALAR_FIRST_QUATERNION
+  "Forces quaternions to be exported real-FIRST, in contravention to Eigen's internal data layout"
+  OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# message(STATUS "BUILD_SHARED_LIBS is " ${BUILD_SHARED_LIBS})
+find_package(Eigen3 3.3.4 REQUIRED)
 
+include(FetchContent)
 
-################################################################################
-#Finding Dependencies
-################################################################################
-message(STATUS "===============   Setup Dependencies   ================")
+FetchContent_Declare(
+  RapidJSON
+  GIT_REPOSITORY "https://github.com/Tencent/rapidjson.git"
+  GIT_TAG "master"
+  GIT_SHALLOW "TRUE"
+  SYSTEM FIND_PACKAGE_ARGS "NAMES;RapidJSON;CONFIG;1.1.0")
 
-if (EIGEN_FROM_SYSTEM)
-  find_package(Eigen3 3.3.4 QUIET)
-  if (EIGEN3_FOUND)
-    message(STATUS "Using system provided Eigen.")
-  else ()
-    message(STATUS "No sufficient Eigen version (3.3.4) found.")
-    message(STATUS "Restoring to download Eigen sources.")
-    include(cmake/eigen.cmake)
-  endif ()
-elseif (EIGEN_ALTERNATIVE STREQUAL "")
-  include(cmake/eigen.cmake)
-else ()
-  set(EIGEN3_INCLUDE_DIRS ${EIGEN_ALTERNATIVE})
-endif ()
-
-#Check for ccache
-if (NOT DEFINED CATKIN_DEVEL_PREFIX)
-    find_program(CCACHE_PROGRAM ccache)
-    if (CCACHE_PROGRAM)
-        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-    else ()
-        message(STATUS "Build time could be improved with ccache!")
-        message(STATUS "    sudo apt install ccache")
-    endif ()
-endif ()
-
-################################################################################
-#Setup Compilation
-################################################################################
-message(STATUS "===============   Setup Compilation   =================")
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-
+FetchContent_MakeAvailable(RapidJSON)
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1048576)
-if (ENABLE_PARALLEL)
-    find_package(OpenMP REQUIRED)
-    message(STATUS "Enabling parallelization!")
-    set(CMAKE_CXX_PAR_FLAGS " -fopenmp")
-else ()
-  add_definitions(-DEIGEN_DONT_PARALLELIZE)
-endif ()
 
-include_directories(include)
-include_directories(AFTER tests)
-include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIRS})
+add_library(${PROJECT_NAME})
+target_sources(
+  ${PROJECT_NAME}
+  PUBLIC FILE_SET
+         "public_headers"
+         TYPE
+         "HEADERS"
+         BASE_DIRS
+         "include"
+         FILES
+         include/drolib/base/corridor_base.hpp
+         include/drolib/base/parameter_base.hpp
+         include/drolib/base/shape_base.hpp
+         include/drolib/corridor/free_corridor.hpp
+         include/drolib/corridor/prisma_corridor.hpp
+         include/drolib/corridor/single_ball.hpp
+         include/drolib/file/file_utils.hpp
+         include/drolib/file/filesystem.hpp
+         include/drolib/file/yaml.hpp
+         include/drolib/geometry/geoutils.hpp
+         include/drolib/geometry/quickhull.hpp
+         include/drolib/math/fast_atan2.hpp
+         include/drolib/math/gravity.hpp
+         include/drolib/math/median.hpp
+         include/drolib/math/min_max_recorder.hpp
+         include/drolib/planner/angle.hpp
+         include/drolib/planner/traj_data.hpp
+         include/drolib/planner/traj_params.hpp
+         include/drolib/planner/traj_solver.hpp
+         include/drolib/planner/waypoint.hpp
+         include/drolib/polynomial/piecewise_polynomial.hpp
+         include/drolib/polynomial/poly_traj_utils.hpp
+         include/drolib/polynomial/polynomial.hpp
+         include/drolib/polynomial/trajectory.hpp
+         include/drolib/race/race_params.hpp
+         include/drolib/race/race_planner.hpp
+         include/drolib/race/race_track.hpp
+         include/drolib/solver/banded_system.hpp
+         include/drolib/solver/lbfgs.hpp
+         include/drolib/solver/lbfgs_params.hpp
+         include/drolib/solver/minco_snap.hpp
+         include/drolib/solver/root_finder.hpp
+         include/drolib/solver/sdlp.hpp
+         include/drolib/system/minco_snap_trajectory.hpp
+         include/drolib/system/quadrotor_manifold.hpp
+         include/drolib/system/quadrotor_params.hpp
+         include/drolib/type/command.hpp
+         include/drolib/type/imu_sample.hpp
+         include/drolib/type/odom.hpp
+         include/drolib/type/quad_state.hpp
+         include/drolib/type/set_point.hpp
+         include/drolib/type/types.hpp
+         include/drolib/utils/logger.hpp
+         include/drolib/utils/timer.hpp
+  PRIVATE src/base/parameter_base.cpp
+          src/base/shape_base.cpp
+          src/corridor/free_corridor.cpp
+          src/corridor/prisma_corridor.cpp
+          src/corridor/single_ball.cpp
+          src/math/math_utils.cpp
+          src/planner/traj_data.cpp
+          src/planner/traj_params.cpp
+          src/planner/traj_solver.cpp
+          src/polynomial/cubic_spline.cpp
+          src/polynomial/cubic_spline3d.cpp
+          src/race/race_params.cpp
+          src/race/race_planner.cpp
+          src/race/race_track.cpp
+          src/rotation/rotation_utils.cpp
+          src/shape/ball.cpp
+          src/shape/free_point.cpp
+          src/shape/hexagon.cpp
+          src/shape/pentagon.cpp
+          src/shape/polygon.cpp
+          src/shape/polyhedron.cpp
+          src/shape/rectangle.cpp
+          src/shape/triangle.cpp
+          src/solver/lbfgs_params.cpp
+          src/system/minco_snap_trajectory.cpp
+          src/system/quadrotor_manifold.cpp
+          src/system/quadrotor_params.cpp
+          src/type/command.cpp
+          src/type/quad_state.cpp
+          src/utils/logger.cpp
+          src/utils/timer.cpp)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+if(TOGT_FORCE_SCALAR_FIRST_QUATERNION)
+  target_compile_definitions(${PROJECT_NAME}
+                             PRIVATE TOGT_FORCE_SCALAR_FIRST_QUATERNION)
+endif(TOGT_FORCE_SCALAR_FIRST_QUATERNION)
 
-#Set default build type
-if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-  if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-  endif ()
-endif ()
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC Eigen3::Eigen
+  PRIVATE "$<COMPILE_ONLY:rapidjson>")
 
-#Fix build type for profiling
-if (ENABLE_PROFILING)
-  if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    message(STATUS "Switching build type to RelWithDebInfo for profiling")
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "" FORCE)
-  endif()
-  add_definitions(-fno-omit-frame-pointer)
-endif()
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
 
-#Add c++ flags
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -g") # Insert debug information
-
-#Architectural flags
-if ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
-    message(STATUS "Using ARMv7 optimized flags!")
-    set(CMAKE_CXX_ARCH_FLAGS " -march=armv7-a -mfpu=neon -mfloat-abi=hard -funsafe-math-optimizations")
-elseif ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
-    message(STATUS "Using ARM aarch64 optimized flags!")
-    set(CMAKE_CXX_ARCH_FLAGS " -march=armv8-a+crypto -mcpu=cortex-a57+crypto")
-elseif ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "arm64")
-    message(STATUS "Using ARM64 optimized flags!")
-    set(CMAKE_CXX_ARCH_FLAGS " -march=armv8-a+crypto -mcpu=cortex-a57+crypto")
-else ()
-    message(STATUS "CATKIN_DEVEL_PREFIX is " ${CATKIN_DEVEL_PREFIX})
-    if (NOT DEFINED CATKIN_DEVEL_PREFIX)
-        set(CMAKE_CXX_ARCH_FLAGS " -march=native")
-    endif ()
-endif ()
-
-#Optimized flags
-if (ENABLE_FAST)
-    message(STATUS "Enabling fast optimization flags!")
-    set(CMAKE_CXX_FAST_FLAGS " -O3")
-else ()
-    set(CMAKE_CXX_FAST_FLAGS " -O0") # No optimization
-endif ()
-if (UNSAFE_MATH)
-    message(STATUS "Using -funsafe-math-optimizations")
-    set(CMAKE_CXX_FAST_FLAGS "${CMAKE_CXX_FAST_FLAGS} -funsafe-math-optimizations")
-endif ()
-
-#DebugLogging
-if(DEBUG_LOGGING)
-  message(STATUS "Enable Debug Logs!")
-  add_definitions(-DDEBUG_LOG)
-endif()
-
-#Summarize Flags
-set(CMAKE_CXX_FLAGS_RELEASE
-  "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FAST_FLAGS} ${CMAKE_CXX_ARCH_FLAGS} ${CMAKE_CXX_PAR_FLAGS} ${CMAKE_CXX_BLAS_FLAGS}")
-string(REPLACE "-DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-message(STATUS "The activated CXX RELEASE configuration is:\n ${CMAKE_CXX_FLAGS_RELEASE}")
-message(STATUS "The activated CXX DEBUG configuration is:\n ${CMAKE_CXX_FLAGS_DEBUG}")
-
-
-################################################################################
-#Specify Build Resources
-################################################################################
-message(STATUS "==================   Setup Build   ====================")
-
-file(GLOB_RECURSE SOURCES
-        src/*.cpp
-        )
-
-#Get all test-related source files
-file(GLOB_RECURSE TEST_SOURCES
-        tests/*.cpp
-        )
-
-################################################################################
-# Optional Catkin Build
-################################################################################
-
-if (DEFINED CATKIN_DEVEL_PREFIX)
-    message(STATUS "============   Building with -- catkin --  ============")
-    include(cmake/catkin.cmake)
-    return()
-endif ()
-
-################################################################################
-# Setup Build
-################################################################################
-
-# Setup Testing and Benchmark
-if (BUILD_TESTS)
-    include(cmake/gtest.cmake)
-    enable_testing()
-endif ()
-
-message(STATUS "SOURCES is " ${SOURCES})
-message(STATUS "TEST_SOURCES is " ${TEST_SOURCES})
-
-if (NOT SOURCES)
-    set(LIBRARY_NAME)
-else ()
-    add_library(${PROJECT_NAME} ${SOURCES})
-    target_link_libraries(${PROJECT_NAME}
-      PUBLIC
-      $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
-    target_compile_options(${PROJECT_NAME} PRIVATE
-      -fno-finite-math-only
-      -Wall
-      -Wextra
-      -Wpedantic
-      -Werror
-      -Wunused
-      -Wno-unused-parameter
-      -Wundef
-      -Wcast-align
-      -Wmissing-declarations
-      -Wmissing-include-dirs
-      -Wnon-virtual-dtor
-      -Wredundant-decls
-      -Wodr
-      -Wunreachable-code
-      -Wno-unknown-pragmas
-    )
-    # To keep the compiler calm about Eigen
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-      target_compile_options(${PROJECT_NAME} PRIVATE
-        -Wno-sign-conversion
-        -Wno-implicit-int-float-conversion
-        -Wno-c99-extensions
-        -Wno-implicit-int-conversion
-      )
-    endif()
-    set(LIBRARY_NAME ${PROJECT_NAME})
-endif ()
-
-
-# Build tests
-if (BUILD_TESTS)
-    add_executable(tests ${TEST_SOURCES})
-    target_compile_options(tests PRIVATE
-      -fno-finite-math-only
-      -Wall                   # Show all warnings
-      -Wextra                 # Show extra error information
-      -Wpedantic              # Issue all the warnings demanded by strict ISO C and ISO C++
-      -Werror                 # Raise all warnings to errors
-      -Wunused                # Warn whatever is assigned to, but unused
-      -Wno-unused-parameter
-      -Wundef                 # Warn if an undefined identifier is evaluated in an #if directive. 
-      -Wcast-align            # Warn whenever a pointer is cast such that the required alignment of the target is increased
-      -Wmissing-declarations  # Warn if a global function is defined without a previous declaration
-      -Wmissing-include-dirs  # Warn if a user-supplied include directory does not exist.
-      -Wnon-virtual-dtor      
-      -Wredundant-decls       # Warn if anything is declared more than once in the same scope
-      -Wodr
-      -Wunreachable-code
-      -Wno-unknown-pragmas
-    )
-    target_link_libraries(tests
-            ${LIBRARY_NAME}
-            gtest
-            gtest_main
-            $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>
-            )
-    add_test(tests tests)
-endif ()
-
-message(STATUS "===========   The TOGT Planner has been built successfully!   ==============")
-
-
+endif(BUILD_TESTING)

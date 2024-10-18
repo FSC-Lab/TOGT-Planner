@@ -14,7 +14,6 @@ namespace drolib {
 
 class QuadManifold {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   QuadManifold();
   QuadManifold(const QuadParams params);
   ~QuadManifold();

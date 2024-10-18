@@ -12,7 +12,6 @@
 namespace drolib {
 
 struct TrajExtremum {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   double maxTime{NAN};
   double length{NAN};
   MinMaxRecorder<double> vel;
@@ -68,7 +67,6 @@ struct TrajExtremum {
 };
 
 struct MincoSnapTrajectory {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   enum RotationType : uint8_t { TILT_HEADING = 0, ROLL_PITCH_YAW = 1 };
   enum HeadingType : uint8_t {
     CONSTANT_HEADING = 0,
