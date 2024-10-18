@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 
 import sys, os
 BASEPATH = os.path.abspath(__file__).split("plots/", 1)[0]+"plots/"
@@ -103,6 +102,6 @@ plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.axis('equal')
 plt.grid()
-plt.savefig('aos_traj.png')
+plt.savefig('aos_traj.png', bbox_inches='tight')
 
 plt.show()

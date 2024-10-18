@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 
 import sys, os
 BASEPATH = os.path.abspath(__file__).split("plots/", 1)[0]+"plots/"
