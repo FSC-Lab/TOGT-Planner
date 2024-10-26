@@ -5,7 +5,6 @@
 namespace drolib {
 
 struct Odom {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Odom() = default;
   Odom(const Odom&) = default;
   ~Odom() = default;

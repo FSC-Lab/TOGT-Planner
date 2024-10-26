@@ -7,7 +7,6 @@
 namespace drolib {
 
 struct Setpoint {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   Setpoint() = default;
   Setpoint(const QuadState& state, const Command& input)

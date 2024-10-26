@@ -5,7 +5,6 @@
 namespace drolib {
 
 struct ImuSample {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   ImuSample() = default;
   ImuSample(const ImuSample&) = default;
 
