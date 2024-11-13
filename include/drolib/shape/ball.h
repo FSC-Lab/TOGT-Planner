@@ -7,6 +7,7 @@ namespace drolib {
 class Ball : public ShapeBase {
  public:
   Ball();
+  Ball(const Eigen::Vector3d& position, const double radius, const double margin);
   Ball(const Yaml &yaml);
 
   bool initialize() override;

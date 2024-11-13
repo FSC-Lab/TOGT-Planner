@@ -2,46 +2,29 @@
 
 namespace drolib {
 
-MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name, 
-                    const QuadManifold& quad,
-                    const TrajData& data,
-                    const double start_yaw, const double end_yaw,
-                    const std::string& name,
-                    const RotationType rtype,
-                    const HeadingType htype)
-    : name(name),
-      quad_name(quad_name),
-      quad(quad),
-      polys(data.traj),
-      start_pvaj(polys.getPVAJ(0.0)),
-      end_pvaj(polys.getPVAJ(data.T.sum())),
-      waypoints(data.P),
-      durations(data.T),
-      start_yaw(start_yaw),
-      end_yaw(end_yaw),
-      rotation_type(rtype),
-      heading_type(htype) {}
+MincoSnapTrajectory::MincoSnapTrajectory(
+    const std::string quad_name, const QuadManifold &quad, const TrajData &data,
+    const double start_yaw, const double end_yaw, const std::string &name,
+    const RotationType rtype, const HeadingType htype)
+    : name(name), quad_name(quad_name), quad(quad), polys(data.traj),
+      start_pvaj(polys.getPVAJ(0.0)), end_pvaj(polys.getPVAJ(data.T.sum())),
+      waypoints(data.P), durations(data.T), start_yaw(start_yaw),
+      end_yaw(end_yaw), rotation_type(rtype), heading_type(htype) {}
 
-MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name, 
-                    const QuadManifold& quad,
-                    const TrajData& data,
-                    const double start_yaw,
-                    const std::string& name)
-    : name(name),
-      quad_name(quad_name),
-      quad(quad),
-      polys(data.traj),
-      start_pvaj(polys.getPVAJ(0.0)),
-      end_pvaj(polys.getPVAJ(data.T.sum())),
-      waypoints(data.P),
-      durations(data.T),
-      start_yaw(start_yaw),
-      end_yaw(start_yaw),
-      rotation_type(RotationType::TILT_HEADING),
-      heading_type(HeadingType::FORWARD_HEADING) {}
+MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name,
+                                         const QuadManifold &quad,
+                                         const TrajData &data,
+                                         const double start_yaw,
+                                         const std::string &name)
+    : name(name), quad_name(quad_name), quad(quad), polys(data.traj),
+      start_pvaj(polys.getPVAJ(0.0)), end_pvaj(polys.getPVAJ(data.T.sum())),
+      waypoints(data.P), durations(data.T), start_yaw(start_yaw),
+      end_yaw(start_yaw), rotation_type(RotationType::TILT_HEADING),
+      heading_type(HeadingType::CONSTANT_HEADING) {}
 
-TrajExtremum MincoSnapTrajectory::getSetpointVec(
-    const double sampleTimeSec) {
+// TODO(chao): change here to modify the heading
+TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
+                                                 const bool forward_heading) {
   TrajExtremum extremum;
   if (!quad.valid()) {
     return extremum;
@@ -66,12 +49,17 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   extremum.vel.add(polys.getMaxVel());
   extremum.acc.add(polys.getMaxAcc());
 
-
   double t{0.0};
   double dt{0.0};
 
   Eigen::Vector3d last_pos = polys.getPos(t);
   double length{0.0};
+  // TODO: Set heading type manually here
+  if (forward_heading) {
+    heading_type = HeadingType::FORWARD_HEADING;
+  } else {
+    heading_type = HeadingType::CONSTANT_HEADING;
+  }
 
   for (int i = 0; i <= nSamples; ++i) {
     pvajs = polys.getPVAJS(t);
@@ -80,16 +68,30 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
     length += (pos - last_pos).norm();
     last_pos = pos;
 
-    //TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
+    // TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
     if (heading_type == HeadingType::FORWARD_HEADING) {
-      yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0, 0.0;
+      // std::cout << "HeadingType::FORWARD_HEADING" << std::endl;
+      yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0,
+          0.0;
+      // std::cout << "FORWARD_HEADING: yaw " << yaw.transpose() << std::endl;
     } else {
-      yaw << start_yaw, 0.0, 0.0;
+      yaw << 0.0, 0.0, 0.0;
+      //  std::cout << "NORMAL_HEADING: yaw " << yaw.transpose() << std::endl;
     }
 
     if (rotation_type == RotationType::TILT_HEADING) {
       quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
+      const Eigen::Quaterniond curr_quat = setpoint.state.q();
+      double dot_product = prev_quat.dot(curr_quat);
+      if (dot_product < 0.0) {
+        std::cout << "Flip detected!!" << std::endl;
+        setpoint.state.q(Eigen::Quaterniond(-curr_quat.w(), -curr_quat.x(),
+                                            -curr_quat.y(), -curr_quat.z()));
+      }
+      prev_quat = curr_quat;
+
       extremum.thrusts.add(setpoint.input.thrusts);
+      extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     } else {
       quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
@@ -105,7 +107,6 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
     t += dt;
   }
 
-
   extremum.length = length;
 
   // Add the last setpoint
@@ -119,48 +120,36 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   return extremum;
 }
 
-bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
+bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
   if (!polys.valid()) {
     return false;
   }
 
-
-  // std::cout << "saveTimestamps" << std::endl;
-  // const double T = polys.getTotalDuration();
-  // std::cout << "T: " << T << std::endl;
-
-  // const int N = polys.getPieceNum();
-  // std::cout << "N: " << N << std::endl;
-
   Eigen::VectorXd durations = polys.getDurations();
   Eigen::Matrix3Xd points = polys.getPoints();
   std::vector<double> timestamps;
-  // std::cout << "durations: " << durations << std::endl;
-
-  // std::cout << "points: " << points << std::endl;
-  // std::cout << "points.cols(): " << points.cols() << std::endl;
-
-
-  // std::vector<double> vecT;
-  // for (int i=0; i < durations.size(); ++i) {
-  //   vecT.push_back(durations[i]);
-  // }
-  // std::cout << "Timestamps:" << std::endl;
 
   timestamps.push_back(0.0);
-  for (int i=0; i < durations.size(); ++i) {
+  for (int i = 0; i < durations.size(); ++i) {
     timestamps.push_back(timestamps.back() + durations[i]);
   }
 
-  // std::partial_sum(vecT.begin(), vecT.end(), timestamps.begin(), std::plus<double>());
-  // for (auto time : timestamps) {
-  //   std::cout << time << std::endl;
-  // }
-
-
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
   std::ofstream file;
   file.open(filename.c_str());
   file.precision(4);
+
+  file << "waypoints: [";
+  for (int i{0}; i < points.cols(); ++i) {
+    if (i < points.cols() - 1) {
+      file << "[" << points.col(i).x() << ", " << points.col(i).y() << ", "
+           << points.col(i).z() << "],\n            ";
+    } else {
+      file << "[" << points.col(i).x() << ", " << points.col(i).y() << ", "
+           << points.col(i).z() << "]";
+    }
+  }
+  file << "]\n\n";
 
   file << "timestamps: [";
   for (int i{0}; i < timestamps.size(); ++i) {
@@ -171,21 +160,6 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
     }
   }
   file << "]\n\n";
-  
-  file << "waypoints: [";
-  for (int i{0}; i < points.cols(); ++i) {
-    if (i < points.cols() - 1) {
-      file << "[" << points.col(i).x() << ", "
-                  << points.col(i).y() << ", " 
-                  << points.col(i).z() << "],\n            ";
-    } else {
-      file << "[" << points.col(i).x() << ", "
-                  << points.col(i).y() << ", " 
-                  << points.col(i).z() << "]";
-    }
-  }
-  file << "]\n\n";
-
 
   file.precision();
   file.close();
@@ -193,8 +167,8 @@ bool MincoSnapTrajectory::saveTimestamps(const std::string &filename) {
   return true;
 }
 
-
-bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const double dt, const int piecesPerSegment) {
+bool MincoSnapTrajectory::saveSegments(const std::string &filename,
+                                       const int piecesPerSegment) {
   if (!polys.valid()) {
     return false;
   }
@@ -225,28 +199,39 @@ bool MincoSnapTrajectory::saveAsSegment(const std::string &filename, const doubl
       raceWaypoints.col(i) = pos;
     }
   }
-  // std::cout << "totalDuration: \n" << raceDurations.sum() << std::endl;
-  // std::cout << "point number: \n" << raceWaypoints.size() << std::endl;
 
-  // std::cout << "raceDurations: \n" << raceDurations.transpose() << std::endl;
-  // std::cout << "raceWaypoints: \n" << raceWaypoints.transpose() << std::endl;
+  std::vector<double> timestamps;
 
-  //TODO: save yaml files
+  timestamps.push_back(0.0);
+  for (int i = 0; i < raceDurations.size(); ++i) {
+    timestamps.push_back(timestamps.back() + raceDurations[i]);
+  }
+
   std::ofstream file;
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
   file.open(filename.c_str());
   file.precision(4);
-  file << "sampled_dt: " << dt << "\n\n";
 
   file << "waypoints: [";
   for (int i{0}; i < raceWaypoints.cols(); ++i) {
     if (i < raceWaypoints.cols() - 1) {
       file << "[" << raceWaypoints.col(i).x() << ", "
-                  << raceWaypoints.col(i).y() << ", " 
-                  << raceWaypoints.col(i).z() << "],\n            ";
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "],\n            ";
     } else {
       file << "[" << raceWaypoints.col(i).x() << ", "
-                  << raceWaypoints.col(i).y() << ", " 
-                  << raceWaypoints.col(i).z() << "]";
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "timestamps: [";
+  for (int i{0}; i < timestamps.size(); ++i) {
+    if (i < timestamps.size() - 1) {
+      file << timestamps[i] << ",\n            ";
+    } else {
+      file << timestamps[i];
     }
   }
   file << "]\n\n";
@@ -276,12 +261,21 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
     return false;
   }
 
+  // std::string directory;
+  // const size_t last_slash_idx = filename.rfind('/');
+  // if (std::string::npos != last_slash_idx)
+  // {
+  //     directory = filename.substr(0, last_slash_idx);
+  // }
+  // fs::create_directory(directory.c_str());
+
   std::ofstream file;
   file.open(filename.c_str());
-  file << "t,p_x,p_y,p_z,q_w,q_x,q_y,q_z,v_x,v_y,v_z,w_x,w_y,w_z,"
+  file << "t,p_x,p_y,p_z,q_x,q_y,q_z,q_w,v_x,v_y,v_z,w_x,w_y,w_z,"
        << "a_lin_x,a_lin_y,a_lin_z,a_rot_x,a_rot_y,a_rot_z,"
        << "u_1,u_2,u_3,u_4,"
-       << "jerk_x,jerk_y,jerk_z,snap_x,snap_y,snap_z\n";
+       << "jerk_x,jerk_y,jerk_z,snap_x,snap_y,snap_z,"
+       << "thrust\n";
   Eigen::Vector3d accRot = Eigen::Vector3d::Zero();
   for (const auto &setpoint : setpoints) {
     const double &t = setpoint.state.t;
@@ -294,14 +288,15 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
     const Eigen::Vector3d &omg = setpoint.input.omega;
     const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
     file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
-         << "," << pos(1) << "," << pos(2) << "," << quat(0) << "," << quat(1)
-         << "," << quat(2) << "," << quat(3) << "," << vel(0) << "," << vel(1)
+         << "," << pos(1) << "," << pos(2) << "," << quat(1) << "," << quat(2)
+         << "," << quat(3) << "," << quat(0) << "," << vel(0) << "," << vel(1)
          << "," << vel(2) << "," << omg(0) << "," << omg(1) << "," << omg(2)
          << "," << acc(0) << "," << acc(1) << "," << acc(2) << "," << accRot(0)
          << "," << accRot(1) << "," << accRot(2) << "," << thrusts(0) << ","
          << thrusts(1) << "," << thrusts(2) << "," << thrusts(3) << ","
          << jer(0) << "," << jer(1) << "," << jer(2) << "," << sna(0) << ","
-         << sna(1) << "," << sna(2) << "\n";
+         << sna(1) << "," << sna(2) << "," << setpoint.input.collective_thrust
+         << "\n";
   }
 
   file.close();
@@ -312,19 +307,18 @@ std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj) {
   os.precision(4);
   // os << std::scientific;
   os << "MincoSnapTrajectory:\n"
-      << "quad_name =      [" << traj.quad_name << "]\n"
-      << "start_pos =      [" << traj.start_pvaj.col(0).transpose() << "]\n"
-      << "end_pos =        [" << traj.end_pvaj.col(0).transpose() << "]\n"
-      << "start_yaw =      [" << traj.start_yaw << "]\n"
-      << "end_yaw =        [" << traj.end_yaw << "]\n"
-      << "rotation_type =  [" << static_cast<int>(traj.rotation_type) << "]\n"
-      << "heading_type =   [" << static_cast<int>(traj.heading_type) << "]\n"
-      << "P:\n [" << traj.waypoints.transpose() << "]\n"
-      << "T:\n [" << traj.durations.transpose() << "]" << std::endl;
+     << "quad_name =      [" << traj.quad_name << "]\n"
+     << "start_pos =      [" << traj.start_pvaj.col(0).transpose() << "]\n"
+     << "end_pos =        [" << traj.end_pvaj.col(0).transpose() << "]\n"
+     << "start_yaw =      [" << traj.start_yaw << "]\n"
+     << "end_yaw =        [" << traj.end_yaw << "]\n"
+     << "rotation_type =  [" << static_cast<int>(traj.rotation_type) << "]\n"
+     << "heading_type =   [" << static_cast<int>(traj.heading_type) << "]\n"
+     << "P:\n [" << traj.waypoints.transpose() << "]\n"
+     << "T:\n [" << traj.durations.transpose() << "]" << std::endl;
   os.precision();
   // os.unsetf(std::ios::scientific);
   return os;
 }
-
 
 } // namespace drolib

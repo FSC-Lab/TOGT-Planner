@@ -39,6 +39,9 @@ bool TrajSolver::solve(const PVAJ &initState,
     return false;
   }
 
+  int total_dim = data.temporalVarDim + data.spatialVarDim;
+  // std::cout << "total_dim: " << total_dim << std::endl;
+
   Eigen::Map<const Eigen::VectorXd> K(data.x.data(), data.temporalVarDim);
   Eigen::Map<const Eigen::VectorXd> D(data.x.data() + data.temporalVarDim, data.spatialVarDim);
   forwardT(K, data.T);

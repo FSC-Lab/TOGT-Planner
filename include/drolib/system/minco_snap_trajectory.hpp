@@ -51,11 +51,11 @@ struct TrajExtremum {
         extremum.thrusts.max().norm() < 1.0e6) {
       os << "minThrusts: " << extremum.thrusts.min().transpose() << " [N]\n"
         << "maxThrusts: " << extremum.thrusts.max().transpose() << " [N]\n"
-        << "minCthrust: " << extremum.thrusts.min().sum() << " [N]\n"
-        << "maxCthrust: " << extremum.thrusts.max().sum() << " [N]\n";
+        << "minCollectivethrust: " << extremum.collectiveThrust.min() << " [N]\n"
+        << "maxCollectivethrust: " << extremum.collectiveThrust.max() << " [N]\n";
     } else {
-      os << "minCthrust: " << extremum.collectiveThrust.min() << " [N]\n"
-        << "maxCthrust: " << extremum.collectiveThrust.max() << " [N]\n";
+      os << "minCollectivethrust: " << extremum.collectiveThrust.min() << " [N]\n"
+        << "maxCollectivethrust: " << extremum.collectiveThrust.max() << " [N]\n";
     }
     os << "-----------------------------------------\n"
        << "Length:   " << extremum.length << " [m]\n"
@@ -107,13 +107,13 @@ struct MincoSnapTrajectory {
 
   bool save(const std::string &filename);
 
-  bool saveAsSegment(const std::string &filename, const double dt, const int piecesPerSegment);
+  bool saveSegments(const std::string &filename, const int piecesPerSegment);
 
-  bool saveTimestamps(const std::string &filename);
+  bool saveAllWaypoints(const std::string &filename);
 
   inline double getTotalDuration() const { return polys.getTotalDuration(); }
 
-  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01); 
+  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01, const bool forward_heading = false); 
 
   std::string name;
   std::string quad_name;
@@ -129,6 +129,7 @@ struct MincoSnapTrajectory {
   HeadingType heading_type{CONSTANT_HEADING};
 
   SetpointVector setpoints;
+  Eigen::Quaterniond prev_quat{Eigen::Quaterniond::Identity()};
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);
 };

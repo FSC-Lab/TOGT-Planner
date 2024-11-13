@@ -76,7 +76,6 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
     cur = prev;
     return true;
   }
-
   assignWaypoints(cur);
 
   PiecewisePolynomial<POLY_DEG> segment;

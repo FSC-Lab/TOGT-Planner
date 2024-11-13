@@ -4,6 +4,16 @@ namespace drolib {
 
 Ball::Ball() {
   this->name = "Ball";
+  this->shape = Shape::BALL;
+}
+
+Ball::Ball(const Eigen::Vector3d& position, const double radius, const double margin) {
+  this->name = "Ball";
+  this->shape = Shape::BALL;
+  this->position = position;
+  this->radius = radius;
+  this->margin = margin;
+  initialize();
 }
 
 Ball::Ball(const Yaml &yaml) {

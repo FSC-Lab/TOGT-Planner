@@ -7,7 +7,7 @@
 #include "drolib/type/set_point.hpp"
 #include "drolib/math/gravity.hpp"
 #include "drolib/planner/traj_params.hpp"
-
+#include <limits>
 #include <cmath>
 
 namespace drolib {

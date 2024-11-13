@@ -21,10 +21,15 @@ public:
   bool solve(std::shared_ptr<RaceTrack> track, const TrajParams &tparams,
              const LbfgsParams &lbfgs);
   bool plan(std::shared_ptr<RaceTrack> track);
+  bool planAOS(std::shared_ptr<RaceTrack> track);
   bool planTOGT(std::shared_ptr<RaceTrack> track);
   MincoSnapTrajectory getTrajectory(void) { return trajectory_; }
   TrajExtremum getExtremum(void) { return extremum_; }
   TrajData getSolution(void) { return solver_.data; }
+  inline bool ready() const { return ready_; }
+  inline void setForwardHeading(const bool forward_heading) {
+    forwardHeading_ = forward_heading;
+  }
 
 private:
   Timer timerPlanning_{"Planning"};
@@ -44,7 +49,13 @@ private:
   MincoSnapTrajectory::RotationType rtype_{
       MincoSnapTrajectory::RotationType::TILT_HEADING};
   MincoSnapTrajectory::HeadingType htype_{
-      MincoSnapTrajectory::HeadingType::CONSTANT_HEADING};
+      MincoSnapTrajectory::HeadingType::FORWARD_HEADING};
+  // MincoSnapTrajectory::HeadingType htype_{
+  //     MincoSnapTrajectory::HeadingType::CONSTANT_HEADING};
+
+      
+
+  bool ready_{false}; 
 };
 
 } // namespace drolib

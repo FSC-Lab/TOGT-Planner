@@ -855,6 +855,9 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   zB2 = alpha2 / alpha_norm_1;
   zB << zB0, zB1, zB2;
   zB2_1 = zB2 + 1;
+  if (fabs(zB2_1) < 1e-6) {
+    zB2_1 = 1e-6;
+  }
 
   // collective thrust: thrust-mass ratio
   // thrust = alpha_norm_1;
@@ -862,119 +865,98 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   thrust = zB0 * params_.mass * a0 
               + zB1 * params_.mass * a1
               + zB2 * params_.mass * (a2 + G);
-
   // if (thrust < 1.0e-3) {
-  //   //Free fall situation
-
-  //   //TODO: compute the quaterinon and bodyrate commands
-  //   // quat
-  //   // omg
-  //   // omgInput
-  //   // tau
-  //   // thrusts
   //   const Eigen::Quaterniond q_heading(quaternionAtUnitZ(yaw(0)));
   //   const Eigen::Quaterniond q_att = q_tilt_last_ * q_heading;
   //   quat(0) = q_att.w();
   //   quat(1) = q_att.x();
   //   quat(2) = q_att.y();
   //   quat(3) = q_att.z();
-
   //   const Eigen::Vector3d body_jerk = q_att.inverse() * jer;
   //   omg = Eigen::Vector3d(-1.0 / thrust * body_jerk[1], 1.0 / thrust * body_jerk[0], yaw(1)); // (0, 0, yawrate)
-  //   // thrusts.setConstant(0.0);
+  //   omgInput = omg;
+  //   thrusts.setConstant(0.0);
+  // } else {
 
-  //   return false;
+    alpha01 = alpha0 * alpha1;
+    alpha12 = alpha1 * alpha2;
+    alpha02 = alpha0 * alpha2;
+
+    ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
+    ng01 = -alpha01 / alpha_norm_3;
+    ng02 = -alpha02 / alpha_norm_3;
+    ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
+    ng12 = -alpha12 / alpha_norm_3;
+    ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
+
+    DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
+
+    // dzB
+    dzB = DN_alpha * jer;
+    dzB0 = dzB(0);
+    dzB1 = dzB(1);
+    dzB2 = dzB(2);
+    dzB2_sqr = dzB2 * dzB2;
+
+    // ddzB
+    DN_alpha_s = DN_alpha * sna;
+    ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 - alpha * j_norm_2 / alpha_norm_3 + alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
+    ddzB0 = ddzB(0);
+    ddzB1 = ddzB(1);
+    ddzB2 = ddzB(2);
+
+    // quaternion
+    tilt_den_2 = 2.0 * (zB2_1);
+    tilt_den = sqrt(tilt_den_2);
+    tilt_den_3 = tilt_den_2 * tilt_den;
+
+    tilt0 = 0.5 * tilt_den;
+    tilt1 = -zB1 / tilt_den;
+    tilt2 = zB0 / tilt_den;
+    q_tilt_last_ = Eigen::Quaterniond(tilt0, tilt1, tilt2, 0.0);
+    
+    quat(0) = tilt0 * c_half_psi;
+    quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
+    quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
+    quat(3) = tilt0 * s_half_psi;
+    // std::cout << "psi: " << psi << "\n";
+    // std::cout << "c_half_psi: " << c_half_psi << "\n";
+    // std::cout << "s_half_psi: " << s_half_psi << "\n";
+    // std::cout << "zB2_1: " << zB2_1 << "\n";
+    // std::cout << "quat: " << quat.transpose() << "\n";
+
+    // bodyrate
+    omg_den = zB2_1;
+    omg_den_2 = omg_den * omg_den;
+    omg_den_4 = omg_den_2 * omg_den_2;
+
+    omg_term = dzB2 / omg_den;
+    tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
+    tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
+    tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
+    omg(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
+    omg(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
+    omg(2) = tmp_omg_3 / omg_den + dpsi;
+    omgInput = omg;
+
+    // body acceleration
+    tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
+    tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
+    tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
+
+    omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den - dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
+    omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den - dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
+    omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
+
+    tau(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
+    tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
+    tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
+
+    // thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
+    thrusts = params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
   // }
 
-  // if (fabs(zB2_1) < 1.0e-4) {
-  //   //TODO: Flip flight situation
-  //   return false;
-  // }
 
-  alpha01 = alpha0 * alpha1;
-  alpha12 = alpha1 * alpha2;
-  alpha02 = alpha0 * alpha2;
-
-  ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
-  ng01 = -alpha01 / alpha_norm_3;
-  ng02 = -alpha02 / alpha_norm_3;
-  ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
-  ng12 = -alpha12 / alpha_norm_3;
-  ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
-
-  DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
-
-  // dzB
-  dzB = DN_alpha * jer;
-  dzB0 = dzB(0);
-  dzB1 = dzB(1);
-  dzB2 = dzB(2);
-  dzB2_sqr = dzB2 * dzB2;
-
-  // ddzB
-  DN_alpha_s = DN_alpha * sna;
-  ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 - alpha * j_norm_2 / alpha_norm_3 + alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
-  ddzB0 = ddzB(0);
-  ddzB1 = ddzB(1);
-  ddzB2 = ddzB(2);
-
-  mat_zB_a = DN_alpha;
-  mat_dzB_j = DN_alpha;
-  mat_ddzB_s = DN_alpha;
-
-  mat_dzB_a = -jer * alpha.transpose() / alpha_norm_3 - (alpha * jer.transpose() + I33 * alpha_dot_j) / alpha_norm_3 + alpha * alpha.transpose() * 3 * alpha_dot_j / alpha_norm_5;
-  mat_ddzB_j = -(jer * alpha.transpose() + alpha * jer.transpose() + I33 * alpha_dot_j) * 2 / alpha_norm_3 + alpha * alpha.transpose() * 6 * alpha_dot_j / alpha_norm_5;
-  mat_ddzB_a = -(I33 * j_norm_2 + jer * jer.transpose() * 2.0) / alpha_norm_3 + ((jer * alpha.transpose() + alpha * jer.transpose()) * 6 * alpha_dot_j + alpha * alpha.transpose() * 3 * j_norm_2 + I33 * 3 * alpha_dot_j_sqr) / alpha_norm_5 - (alpha * alpha.transpose() * 15 * alpha_dot_j_sqr) / alpha_norm_7 + mat_DNalphas_a;
-
-  // quaternion
-  tilt_den_2 = 2.0 * (zB2_1);
-  tilt_den = sqrt(tilt_den_2);
-  tilt_den_3 = tilt_den_2 * tilt_den;
-
-  tilt0 = 0.5 * tilt_den;
-  tilt1 = -zB1 / tilt_den;
-  tilt2 = zB0 / tilt_den;
-  // q_tilt_last_ = Eigen::Quaterniond(tilt0, tilt1, tilt2, 0.0);
-  
-  quat(0) = tilt0 * c_half_psi;
-  quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
-  quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
-  quat(3) = tilt0 * s_half_psi;
-
-  // bodyrate
-  omg_den = zB2_1;
-  omg_den_2 = omg_den * omg_den;
-  omg_den_4 = omg_den_2 * omg_den_2;
-
-  omg_term = dzB2 / omg_den;
-  tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
-  tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
-  tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
-  omg(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
-  omg(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
-  omg(2) = tmp_omg_3 / omg_den + dpsi;
-  omgInput = omg;
-
-  // derivative of torque w.r.t. omg
-  mat_tor_w << 0.0, inertiaGapZY * omg(2), inertiaGapZY * omg(1),
-                inertiaGapXZ * omg(2), 0.0, inertiaGapXZ * omg(0),
-                inertiaGapYX * omg(1), inertiaGapYX * omg(0), 0.0;
-
-  // body acceleration
-  tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
-  tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
-  tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
-
-  omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den - dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
-  omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den - dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
-  omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
-
-  tau(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
-  tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
-  tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
-
-  // thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
-  thrusts = params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
   return true;
 }
 
