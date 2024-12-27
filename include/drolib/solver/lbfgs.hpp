@@ -280,9 +280,14 @@ inline int line_search_lewisoverton(Eigen::VectorXd &x,
                                     const callback_data_t &cd,
                                     const lbfgs_parameter_t &param) {
   int count = 0;
-  bool brackt = false, touched = false;
-  double finit, dginit, dgtest, dstest;
-  double mu = 0.0, nu = stpmax;
+  bool brackt = false;
+  bool touched = false;
+  double finit;
+  double dginit;
+  double dgtest;
+  double dstest;
+  double mu = 0.0;
+  double nu = stpmax;
 
   /* Check the input parameters for errors. */
   if (!(stp > 0.0)) {
@@ -412,9 +417,24 @@ inline int lbfgs_optimize(Eigen::VectorXd &x,
                           lbfgs_progress_t proc_progress,
                           void *instance,
                           const lbfgs_parameter_t &param) {
-  int ret, i, j, k, ls, end, bound;
-  double step, step_min, step_max, fx, ys, yy;
-  double gnorm_inf, xnorm_inf, beta, rate, cau;
+  int ret;
+  int i;
+  int j;
+  int k;
+  int ls;
+  int end;
+  int bound;
+  double step;
+  double step_min;
+  double step_max;
+  double fx;
+  double ys;
+  double yy;
+  double gnorm_inf;
+  double xnorm_inf;
+  double beta;
+  double rate;
+  double cau;
 
   const int n = x.size();
   const int m = param.mem_size;
