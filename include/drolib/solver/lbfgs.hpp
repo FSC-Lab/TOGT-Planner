@@ -195,9 +195,8 @@ enum {
      *                      the gradient values for the current variables.
      *  @retval double      The value of the cost function for the current variables.
      */
-typedef double (*lbfgs_evaluate_t)(void *instance,
-                                   const Eigen::VectorXd &x,
-                                   Eigen::VectorXd &g);
+using lbfgs_evaluate_t =
+    std::function<double(void *, const Eigen::VectorXd &, Eigen::VectorXd &)>;
 
 /**
      * Callback interface to provide an upper bound at the beginning of the current line search.
@@ -216,9 +215,8 @@ typedef double (*lbfgs_evaluate_t)(void *instance,
      *  @retval double      The upperboud of the step in current line search routine,
      *                      such that (stpbound * d) is the maximum reasonable step.
      */
-typedef double (*lbfgs_stepbound_t)(void *instance,
-                                    const Eigen::VectorXd &xp,
-                                    const Eigen::VectorXd &d);
+using lbfgs_stepbound_t = std::function<double(
+    void *, const Eigen::VectorXd &, const Eigen::VectorXd &)>;
 
 /**
      * Callback interface to monitor the progress of the minimization process.
@@ -237,13 +235,13 @@ typedef double (*lbfgs_stepbound_t)(void *instance,
      *  @retval int         Zero to continue the minimization process. Returning a
      *                      non-zero value will cancel the minimization process.
      */
-typedef int (*lbfgs_progress_t)(void *instance,
-                                const Eigen::VectorXd &x,
-                                const Eigen::VectorXd &g,
-                                const double fx,
-                                const double step,
-                                const int k,
-                                const int ls);
+using lbfgs_progress_t = std::function<int(void *,
+                                           const Eigen::VectorXd &,
+                                           const Eigen::VectorXd &,
+                                           const double,
+                                           const double,
+                                           const int,
+                                           const int)>;
 
 /**
      * Callback data struct
