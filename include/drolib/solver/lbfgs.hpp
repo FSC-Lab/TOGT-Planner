@@ -1,9 +1,10 @@
 #ifndef LBFGS_HPP
 #define LBFGS_HPP
 
-#include <Eigen/Eigen>
 #include <algorithm>
 #include <cmath>
+
+#include "Eigen/Dense"
 
 namespace drolib {
 // ----------------------- Data Type Part -----------------------
