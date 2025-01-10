@@ -109,11 +109,13 @@ struct MincoSnapTrajectory {
 
   bool saveSegments(const std::string &filename, const int piecesPerSegment);
 
+  bool saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments);
+
   bool saveAllWaypoints(const std::string &filename);
 
   inline double getTotalDuration() const { return polys.getTotalDuration(); }
 
-  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01, const bool forward_heading = false); 
+  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01, const bool forward_heading = false, const bool tilt_convention = true); 
 
   std::string name;
   std::string quad_name;
@@ -130,6 +132,8 @@ struct MincoSnapTrajectory {
 
   SetpointVector setpoints;
   Eigen::Quaterniond prev_quat{Eigen::Quaterniond::Identity()};
+
+  double horizon{0.5};
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);
 };

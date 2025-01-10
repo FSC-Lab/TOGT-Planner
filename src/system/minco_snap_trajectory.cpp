@@ -24,7 +24,8 @@ MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name,
 
 // TODO(chao): change here to modify the heading
 TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
-                                                 const bool forward_heading) {
+                                                 const bool forward_heading,
+                                                 const bool tilt_convention) {
   TrajExtremum extremum;
   if (!quad.valid()) {
     return extremum;
@@ -42,6 +43,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
   Eigen::Vector3d yaw;
 
   double lastHeading = start_yaw;
+  std::cout << "start yaw:" << start_yaw << std::endl;
   Eigen::Quaterniond lastTilt{1, 0, 0, 0};
 
   extremum.vel.add(0.0);
@@ -55,11 +57,11 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
   Eigen::Vector3d last_pos = polys.getPos(t);
   double length{0.0};
   // TODO: Set heading type manually here
-  if (forward_heading) {
-    heading_type = HeadingType::FORWARD_HEADING;
-  } else {
-    heading_type = HeadingType::CONSTANT_HEADING;
-  }
+  // if (forward_heading) {
+  //   heading_type = HeadingType::FORWARD_HEADING;
+  // } else {
+  //   heading_type = HeadingType::CONSTANT_HEADING;
+  // }
 
   for (int i = 0; i <= nSamples; ++i) {
     pvajs = polys.getPVAJS(t);
@@ -69,30 +71,164 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
     last_pos = pos;
 
     // TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
-    if (heading_type == HeadingType::FORWARD_HEADING) {
-      // std::cout << "HeadingType::FORWARD_HEADING" << std::endl;
-      yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0,
-          0.0;
+    if (forward_heading) {
+      // if (horizon < sampleTimeSec) {
+      // yaw << wrapMinusPiToPi(getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading)), 0.0, 0.0;
+
+      // yaw << 0.0, 0.0, 0.0;
+  
+      // } else {
+      double heading{0.0};
+      const auto pvajs_future = polys.getPVAJS(std::min(T, t + horizon));
+      const Eigen::Vector3d future_pos = pvajs_future.col(0);
+      const Eigen::Vector3d diff = future_pos - pos;
+      // std::cout << "diff: " << diff.transpose() << std::endl;
+      if (diff.head<2>().norm() > 1e-3) {
+        heading = wrapZeroToTwoPi(std::atan2(diff.y(), diff.x()));
+      } else {
+        heading = lastHeading;
+      }
+      yaw << heading, 0.0, 0.0;
+      if (std::fabs(heading - lastHeading) > deg2rad(90)) {
+        std::cout << "Yaw jump detected at " << t << ", current heading: " << heading << ", previous heading: " << lastHeading << std::endl;
+      }
+      lastHeading = heading;
+
+      // }
+
       // std::cout << "FORWARD_HEADING: yaw " << yaw.transpose() << std::endl;
     } else {
       yaw << 0.0, 0.0, 0.0;
       //  std::cout << "NORMAL_HEADING: yaw " << yaw.transpose() << std::endl;
     }
 
-    if (rotation_type == RotationType::TILT_HEADING) {
+    if (tilt_convention) {
       quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
-      const Eigen::Quaterniond curr_quat = setpoint.state.q();
-      double dot_product = prev_quat.dot(curr_quat);
-      if (dot_product < 0.0) {
-        std::cout << "Flip detected!!" << std::endl;
-        setpoint.state.q(Eigen::Quaterniond(-curr_quat.w(), -curr_quat.x(),
-                                            -curr_quat.y(), -curr_quat.z()));
+      Eigen::Quaterniond curr_quat = setpoint.state.q();
+      if (t < 0.5) {
+      std::cout << "yaw: " << yaw.transpose() << ", v: " << pvajs.col(1).transpose() << ", a: " << pvajs.col(2).transpose() << std::endl;
+
       }
+      if (i == 0) {
+        // do nothing
+        if (curr_quat.w() < 0.0) {
+          curr_quat.coeffs() = -curr_quat.coeffs();
+          std::cout << "-------------Case 1-------------" << std::endl;
+          // std::cout << "Flip detected at " << t << std::endl;
+          // std::cout << "current quat_error: \n" << quat_error.norm() << std::endl;
+          std::cout << "current q: " << curr_quat.coeffs().transpose()
+                    << std::endl;
+          // std::cout << "previous q: " << prev_quat.coeffs().transpose()
+          //           << std::endl;
+        }
+
+      } else {
+
+        double dot_product = prev_quat.coeffs().dot(curr_quat.coeffs());
+        Eigen::Quaterniond quat_diff = curr_quat * prev_quat.inverse();
+        Eigen::Vector3d quat_error =
+            quatDiff(curr_quat.coeffs(), prev_quat.coeffs());
+        double c_half_psi = cos(0.5 * yaw[0]);
+
+
+        // else if (!quat_diff.coeffs()) {
+        //         std::cout << "-------------Case 2-------------" << std::endl;
+        //         std::cout << "Flip detected at " << t << std::endl;
+
+        //       }
+
+        // CHECK 1
+        // if (curr_quat.w() < 0.0) {
+        //   curr_quat.coeffs() = -curr_quat.coeffs();
+        //   setpoint.state.q(curr_quat);
+        //   std::cout << "-------------Case 1-------------" << std::endl;
+        //   std::cout << "Flip detected at " << t << std::endl;
+        //   std::cout << "current quat_error: \n" << quat_error.transpose() <<
+        //   std::endl; std::cout << "current q: " <<
+        //   curr_quat.coeffs().transpose() << std::endl; std::cout << "previous
+        //   q: " << prev_quat.coeffs().transpose() << std::endl;
+
+        // } else if (dot_product < 0.0) {
+        //   setpoint.state.q(Eigen::Quaterniond(-curr_quat.w(), -curr_quat.x(),
+        //                                       -curr_quat.y(),
+        //                                       -curr_quat.z()));
+        //   curr_quat = setpoint.state.q();
+        //   std::cout << "-------------Case 3-------------" << std::endl;
+        //   std::cout << "Flip detected at " << t << std::endl;
+        //   std::cout << "current quat_error: \n" << quat_error.transpose() <<
+        //   std::endl; std::cout << "current q: " <<
+        //   curr_quat.coeffs().transpose() << std::endl; std::cout << "previous
+        //   q: " << prev_quat.coeffs().transpose() << std::endl;
+        // }
+
+        // CHECK 2
+        // if (dot_product < 0.0) {
+        //   setpoint.state.q(Eigen::Quaterniond(curr_quat.w(), -curr_quat.x(),
+        //                                       -curr_quat.y(),
+        //                                       -curr_quat.z()));
+        //   std::cout << "-------------Case 3-------------" << std::endl;
+        //   std::cout << "Flip detected at " << t << std::endl;
+        //   std::cout << "current quat_error: \n"
+        //             << quat_error.norm() << std::endl;
+        //   std::cout << "current q: " << curr_quat.coeffs().transpose()
+        //             << std::endl;
+        //   std::cout << "previous q: " << prev_quat.coeffs().transpose()
+        //             << std::endl;
+        //   curr_quat = setpoint.state.q();
+
+        // }
+
+        // CHECK 4
+        // if ((prev_quat.coeffs() + curr_quat.coeffs()).squaredNorm() <
+        //     (prev_quat.coeffs() - curr_quat.coeffs()).squaredNorm()) {
+        //   // curr_quat.coeffs() = -curr_quat.coeffs();
+
+        //   std::cout << "-------------Case 4-------------" << std::endl;
+        //   std::cout << "Flip detected at " << t << std::endl;
+        //   std::cout << "c_half_psi:" << c_half_psi << std::endl;
+        //   std::cout << "current quat_error: \n"
+        //             << quat_error.norm() << std::endl;
+        //   std::cout << "current q: " << curr_quat.coeffs().transpose()
+        //             << std::endl;
+        //   std::cout << "previous q: " << prev_quat.coeffs().transpose()
+        //             << std::endl;
+        // }
+
+        if (quat_error.norm() > 0.3) {
+          Eigen::Vector3d pos = pvajs.col(0);
+          Eigen::Vector3d vel = pvajs.col(1);  
+          Eigen::Vector3d acc = pvajs.col(2);
+          Eigen::Vector3d jer = pvajs.col(3);
+          Eigen::Vector3d sna = pvajs.col(4);
+
+          Eigen::Vector3d alpha = acc + Eigen::Vector3d(0, 0, G);
+          Eigen::Vector3d z_B = alpha.normalized();
+
+
+          std::cout << "-------------Large rotation jump-------------" << std::endl;
+          std::cout << "Jump detected at " << t << std::endl;
+          std::cout << "yaw: " << yaw.transpose() << std::endl;
+          std::cout << "current quat_error: \n"
+                    << quat_error.transpose() << std::endl;
+          std::cout << "z_B: " << z_B.transpose() << std::endl;         
+          std::cout << "current q: " << curr_quat.coeffs().transpose()
+                    << std::endl;
+          std::cout << "previous q: " << prev_quat.coeffs().transpose()
+                    << std::endl;
+        }
+
+      }
+
+
+
       prev_quat = curr_quat;
+      setpoint.state.q(curr_quat);
 
       extremum.thrusts.add(setpoint.input.thrusts);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     } else {
+
+      // yaw << 0.0, 0.0, 0.0;
       quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     }
@@ -111,7 +247,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   // Add the last setpoint
   pvajs = polys.getPVAJS(t);
-  if (rotation_type == RotationType::TILT_HEADING) {
+  if (tilt_convention) {
     quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
   } else {
     quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
@@ -167,6 +303,97 @@ bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
   return true;
 }
 
+bool MincoSnapTrajectory::saveSegments(
+    const std::string &filename,
+    const std::vector<std::pair<int, int>> &segments) {
+  if (!polys.valid()) {
+    return false;
+  }
+  Eigen::VectorXd durations = polys.getDurations();
+  Eigen::Matrix3Xd points = polys.getPoints();
+
+  const int nSegments = segments.size();
+
+  Eigen::VectorXd raceDurations;
+  Eigen::Matrix3Xd raceWaypoints;
+  raceDurations.resize(nSegments);
+  raceWaypoints.resize(3, nSegments - 1);
+
+  std::cout << "piece number: " << durations.size() << std::endl;
+
+  for (int i = 0; i < nSegments; ++i) {
+    if (segments[i].first < 0 || segments[i].second < 0) {
+      return false;
+    }
+
+    std::cout << "segments[" << i << "]: " << segments[i].first << ", "
+              << segments[i].second << std::endl;
+  }
+
+  int idx{0};
+  for (int i{0}; i < nSegments; ++i) {
+    double dur = durations.segment(segments[i].first, segments[i].second).sum();
+    raceDurations[i] = dur;
+    // std::cout << "idx: " << idx << " dur: " << dur << std::endl;
+    idx += segments[i].second;
+    if (i < nSegments - 1) {
+      Eigen::Vector3d pos = points.col(idx);
+      raceWaypoints.col(i) = pos;
+    }
+  }
+
+  std::vector<double> timestamps;
+
+  timestamps.push_back(0.0);
+  for (int i = 0; i < raceDurations.size(); ++i) {
+    timestamps.push_back(timestamps.back() + raceDurations[i]);
+  }
+
+  std::ofstream file;
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
+  file.open(filename.c_str());
+  file.precision(4);
+
+  file << "waypoints: [";
+  for (int i{0}; i < raceWaypoints.cols(); ++i) {
+    if (i < raceWaypoints.cols() - 1) {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "],\n            ";
+    } else {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "timestamps: [";
+  for (int i{0}; i < timestamps.size(); ++i) {
+    if (i < timestamps.size() - 1) {
+      file << timestamps[i] << ",\n            ";
+    } else {
+      file << timestamps[i];
+    }
+  }
+  file << "]\n\n";
+
+  file << "durations: [";
+  for (int i{0}; i < raceDurations.size(); ++i) {
+    if (i < raceDurations.size() - 1) {
+      file << raceDurations[i] << ",\n            ";
+    } else {
+      file << raceDurations[i];
+    }
+  }
+  file << "]";
+
+  file.precision();
+  file.close();
+
+  return true;
+}
+
 bool MincoSnapTrajectory::saveSegments(const std::string &filename,
                                        const int piecesPerSegment) {
   if (!polys.valid()) {
@@ -177,6 +404,9 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename,
 
   const double nPieces = durations.size();
   const double nSegments = nPieces / piecesPerSegment;
+
+  std::cout << "nPieces: " << nPieces << std::endl;
+  std::cout << "nSegments: " << nSegments << std::endl;
 
   Eigen::VectorXd raceDurations;
   Eigen::Matrix3Xd raceWaypoints;
@@ -192,7 +422,7 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename,
   for (int i{0}; i < nSegments; ++i) {
     double dur = durations.segment(idx, piecesPerSegment).sum();
     raceDurations[i] = dur;
-
+    std::cout << "idx: " << idx << " dur: " << dur << std::endl;
     idx += piecesPerSegment;
     if (i < nSegments - 1) {
       Eigen::Vector3d pos = points.col(idx);
@@ -258,7 +488,7 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
   }
 
   if (!setpoints.front().input.isSingleRotorThrusts()) {
-    return false;
+    // setpoint.input.thrusts;
   }
 
   // std::string directory;
@@ -287,6 +517,7 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
     const Eigen::Vector4d &quat = setpoint.state.qx;
     const Eigen::Vector3d &omg = setpoint.input.omega;
     const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
+    // std::cout << "quat(0): " << quat(0) << std::endl;
     file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
          << "," << pos(1) << "," << pos(2) << "," << quat(1) << "," << quat(2)
          << "," << quat(3) << "," << quat(0) << "," << vel(0) << "," << vel(1)

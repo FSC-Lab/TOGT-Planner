@@ -1,4 +1,5 @@
 #include "drolib/race/race_planner.hpp"
+#include <chrono>
 
 namespace drolib {
 
@@ -121,6 +122,8 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
 
   // Solve initial guesses
   {
+    auto start_time_point_ = std::chrono::high_resolution_clock::now();
+
     TrajData newdata;
     track->initCorridors(params_.tpinit.piecesPerSegment - 1);
 
@@ -131,17 +134,39 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
       std::cout << "First optimizatoin fails!\n";
       return false;
     }
+
+    auto end_timepoint = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::time_point_cast<std::chrono::microseconds>(
+                     start_time_point_)
+                     .time_since_epoch()
+                     .count();
+    auto end =
+        std::chrono::time_point_cast<std::chrono::microseconds>(end_timepoint)
+            .time_since_epoch()
+            .count();
+    auto duration = end - start;
+    const double kMilliSecToSec = 0.001;
+    double ms = static_cast<double>(duration) * kMilliSecToSec;
+
+    std::cout << "Time for initialization:" << duration << " us (" << ms << " ms)\n";
   }
 
-  // Refine the trajectory
+ // Refine the trajectory
   TrajData initdata, refinedata; 
   {
+    // track->segments.clear();
+
+    auto start_time_point_ = std::chrono::high_resolution_clock::now();
+
     // TrajData refinedata;
     track->initCorridors(params_.tprefine.piecesPerSegment - 1);
     track->getData(solver_.data, refinedata);
 
     initdata = solver_.data;
     solver_.setInitialGuess(refinedata);
+    // TODO(chao): fix this bug of using previous segments to extract initial guesses
+    track->resetSegments();
+
     if (!solve(track, params_.tprefine, params_.lprefine)) {
       std::cout << "Second optimizatoin fails!\n";
       if (forwardHeading_) {
@@ -152,9 +177,8 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
         trajectory_ =
             MincoSnapTrajectory(params_.qp.name, quad_, initdata, initHeading,
                                 track->getName() + " Trajectory");
-        extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, true);
+        extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
       } else {
-        htype_ = MincoSnapTrajectory::HeadingType::CONSTANT_HEADING;
         trajectory_ = MincoSnapTrajectory(
             params_.qp.name, quad_, initdata, desiredYaw_, desiredYaw_,
             track->getName() + " Trajectory", rtype_, htype_);
@@ -168,25 +192,46 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
 
         Eigen::Vector3d diff = solver_.data.traj.getPos(trajSampleTimeSec_) -
                               solver_.data.traj.getPos(0.0);
-        const double initHeading = std::atan2(diff.y(), diff.x());
+        const double initHeading = wrapZeroToTwoPi(std::atan2(diff.y(), diff.x()));
         trajectory_ =
             MincoSnapTrajectory(params_.qp.name, quad_, solver_.data, initHeading,
                                 track->getName() + " Trajectory");
-        extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, true);
+        const bool tilt_convention = true;
+        extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, forwardHeading_, tilt_convention);
+
+        // TODO(chao): generate trajectory that keeps the drone toward the gate
+        std::vector<Eigen::Vector3d> gatepoints = track->getGatepoints();
+        
+
+
       } else {
         std::cout << "Not using forward heading" << std::endl;
-        std::cout << "desiredYaw_: " << desiredYaw_ << std::endl;
-        
-        htype_ = MincoSnapTrajectory::HeadingType::CONSTANT_HEADING;
+
         trajectory_ = MincoSnapTrajectory(
             params_.qp.name, quad_, solver_.data, desiredYaw_, desiredYaw_,
             track->getName() + " Trajectory", rtype_, htype_);
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
       }
-    }    
-  }
+    }   
 
+    auto end_timepoint = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::time_point_cast<std::chrono::microseconds>(
+                     start_time_point_)
+                     .time_since_epoch()
+                     .count();
+    auto end =
+        std::chrono::time_point_cast<std::chrono::microseconds>(end_timepoint)
+            .time_since_epoch()
+            .count();
+    auto duration = end - start;
+    const double kMilliSecToSec = 0.001;
+    double ms = static_cast<double>(duration) * kMilliSecToSec;
+
+    std::cout << "Time for AOS:" << duration << " us (" << ms << " ms)\n";
+
+  }
   track->updateWaypoints(solver_.data);
+
   return true;
 }
 

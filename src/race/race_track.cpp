@@ -76,6 +76,7 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
     cur = prev;
     return true;
   }
+  // segments.clear();
   assignWaypoints(cur);
 
   PiecewisePolynomial<POLY_DEG> segment;
@@ -135,6 +136,7 @@ bool RaceTrack::getData(const double speedGuess, TrajData &tdata) {
 void RaceTrack::assignWaypoints(TrajData &tdata) {
   int idx{0};
   tdata.clear();
+  // segments.clear();
   for (size_t i{0}; i < corridors.size(); ++i) {
     tdata.append(corridors[i]->corridor);
 
@@ -152,6 +154,26 @@ void RaceTrack::assignWaypoints(TrajData &tdata) {
   }
   tdata.allocateSpace();
 }
+
+void RaceTrack::resetSegments() {
+  int idx{0};
+  segments.clear();
+  for (size_t i{0}; i < corridors.size(); ++i) {
+
+    segments.emplace_back(idx, corridors[i]->size() + 1);
+    idx += corridors[i]->size() + 1;
+
+    if (i < gates.size()) {
+
+      if (gates[i]->size() >= 2) {
+        segments.emplace_back(idx, gates[i]->size() - 1);
+        idx += gates[i]->size() - 1;
+      }
+    }
+  }
+
+}
+
 
 // void RaceTrack::saveWaypoints(const std::string &filename) {
 //   std::ofstream file;
@@ -264,6 +286,7 @@ void RaceTrack::initCorridors(const int midpoints) {
     // initCorridor(i, p0, p1, midpoints);
     corridors.push_back(std::make_shared<FreeCorridor>(p0, p1, midpoints, minCorDist));
   }
+
 }
 
 std::ostream& operator<<(std::ostream& os, const RaceTrack& track) {

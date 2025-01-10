@@ -5,6 +5,9 @@
 
 namespace drolib {
 
+
+Eigen::Vector3d quatDiff(const Eigen::Vector4d& q, const Eigen::Vector4d& q_ref);
+
 Eigen::Vector3d rad2deg(const Eigen::Vector3d& rad);
 Eigen::Vector3d deg2rad(const Eigen::Vector3d& deg);
 Eigen::Quaterniond quatDelta(const Eigen::Vector3d& theta);

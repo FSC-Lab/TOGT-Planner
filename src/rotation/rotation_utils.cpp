@@ -2,6 +2,29 @@
 
 namespace drolib {
 
+Eigen::Vector3d quatDiff(const Eigen::Vector4d& q, const Eigen::Vector4d& q_ref) {
+    // q.inverse() * q_ref;
+    Eigen::Vector4d q_aux;
+    q_aux << 
+        -q(0) * q_ref(3) + q(3) * q_ref(0) + q(2) * q_ref(1) - q(1) * q_ref(2),
+        -q(1) * q_ref(3) - q(2) * q_ref(0) + q(3) * q_ref(1) + q(0) * q_ref(2),
+        -q(2) * q_ref(3) + q(1) * q_ref(0) - q(0) * q_ref(1) + q(3) * q_ref(2),
+         q(3) * q_ref(3) + q(0) * q_ref(0) + q(1) * q_ref(1) + q(2) * q_ref(2);
+
+    // Attitude errors. SQRT have small quantities added (1e-3) to alleviate
+    // the derivative not being defined at zero, and also because it's in the denominator
+    double q_att_denom = std::sqrt(q_aux(3) * q_aux(3) + q_aux(2) * q_aux(2) + 1e-3);
+
+    Eigen::Vector3d q_att;
+    q_att << 
+        (q_aux(3) * q_aux(0) - q_aux(1) * q_aux(2)) / q_att_denom,  // roll
+        (q_aux(3) * q_aux(1) + q_aux(0) * q_aux(2)) / q_att_denom,  // pitch
+        q_aux(2) / q_att_denom;                                    // yaw
+
+    return q_att;
+}
+
+
 Eigen::Vector3d rad2deg(const Eigen::Vector3d& rad) {
   return Eigen::Vector3d(rad2deg(rad.x()), rad2deg(rad.y()), rad2deg(rad.z()));
 }
@@ -261,9 +284,13 @@ double getHeading(Eigen::Ref<Eigen::Vector3d> acc, Eigen::Ref<Eigen::Vector3d> v
   double heading{0.0};
   const Eigen::Vector3d thrust_vec = acc - Eigen::Vector3d(0.0, 0.0, -9.8066);
   const double thrust = thrust_vec.norm();
+  // const Eigen::Quaterniond q_pitch_roll =
+  //   thrust > 1e-3 ? Eigen::Quaterniond::FromTwoVectors(Eigen::Vector3d::UnitZ(), thrust_vec)
+  //                 : lastTilt;
+
   const Eigen::Quaterniond q_pitch_roll =
-    thrust > 1e-3 ? Eigen::Quaterniond::FromTwoVectors(Eigen::Vector3d::UnitZ(), thrust_vec)
-                  : lastTilt;
+    thrust > 1e-3 ? quaternionFromUnitZToV(thrust_vec)
+                  : lastTilt;  
   lastTilt = q_pitch_roll;
 
   const Eigen::Vector3d v_body = q_pitch_roll.inverse() * vel;
@@ -272,6 +299,8 @@ double getHeading(Eigen::Ref<Eigen::Vector3d> acc, Eigen::Ref<Eigen::Vector3d> v
   } else {
     heading = lastHeading;
   }
+
+  lastHeading = heading;
   return heading;                 
 }     
 
