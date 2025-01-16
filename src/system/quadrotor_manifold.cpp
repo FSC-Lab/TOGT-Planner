@@ -55,7 +55,7 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
   const Eigen::Vector3d accCmd = acc - GVEC;
   // collective_thrust = accCmd.norm() * params_.mass;
   collective_thrust = accCmd.norm(); // thrust-mass ratio
-  thrusts.setConstant(NAN);
+  thrusts.setConstant(params_.mass *  collective_thrust / 4.0);
 
   const Eigen::Quaterniond q_c(Eigen::Quaterniond(Eigen::AngleAxis<double>(yawAng, Eigen::Vector3d::UnitZ())));
   const Eigen::Vector3d x_c = q_c * Eigen::Vector3d::UnitX();
@@ -73,7 +73,7 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
   omg.z() = 1.0 / (y_c.cross(z_B)).norm() *
             (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B));
   omgInput = omg;
-  tau.setConstant(NAN);
+  tau.setConstant(0.0);
 
   return true;
 }
@@ -862,9 +862,10 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   // collective thrust: thrust-mass ratio
   // thrust = alpha_norm_1;
 
-  thrust = zB0 * params_.mass * a0 
-              + zB1 * params_.mass * a1
-              + zB2 * params_.mass * (a2 + G);
+  thrust = zB0 * a0 
+              + zB1 * a1
+              + zB2 * (a2 + G);
+              
   // if (thrust < 1.0e-3) {
   //   const Eigen::Quaterniond q_heading(quaternionAtUnitZ(yaw(0)));
   //   const Eigen::Quaterniond q_att = q_tilt_last_ * q_heading;

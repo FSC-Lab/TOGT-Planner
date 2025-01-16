@@ -109,6 +109,8 @@ struct MincoSnapTrajectory {
 
   bool saveSegments(const std::string &filename, const int piecesPerSegment);
 
+  bool saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments);
+
   bool saveAllWaypoints(const std::string &filename);
 
   inline double getTotalDuration() const { return polys.getTotalDuration(); }

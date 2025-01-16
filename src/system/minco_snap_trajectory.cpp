@@ -78,7 +78,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
       yaw << 0.0, 0.0, 0.0;
       //  std::cout << "NORMAL_HEADING: yaw " << yaw.transpose() << std::endl;
     }
-
+    // rotation_type = RotationType::ROLL_PITCH_YAW;
     if (rotation_type == RotationType::TILT_HEADING) {
       quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
       const Eigen::Quaterniond curr_quat = setpoint.state.q();
@@ -167,6 +167,95 @@ bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
   return true;
 }
 
+bool MincoSnapTrajectory::saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments) {
+  if (!polys.valid()) {
+    return false;
+  }
+  Eigen::VectorXd durations = polys.getDurations();
+  Eigen::Matrix3Xd points = polys.getPoints();
+
+  const int nSegments = segments.size();
+ 
+  Eigen::VectorXd raceDurations;
+  Eigen::Matrix3Xd raceWaypoints;
+  raceDurations.resize(nSegments);
+  raceWaypoints.resize(3, nSegments - 1);
+
+  std::cout << "piece number: " << durations.size() << std::endl;
+
+  for (int i = 0; i < nSegments; ++i) {
+    if (segments[i].first < 0 || segments[i].second < 0) {
+      return false;
+    }
+
+    std::cout << "segments[" << i << "]: " << segments[i].first << ", " << segments[i].second << std::endl;
+  }
+
+  int idx{0};
+  for (int i{0}; i < nSegments; ++i) {
+    double dur = durations.segment(segments[i].first, segments[i].second).sum();
+    raceDurations[i] = dur;
+    // std::cout << "idx: " << idx << " dur: " << dur << std::endl;
+    idx += segments[i].second;
+    if (i < nSegments - 1) {
+      Eigen::Vector3d pos = points.col(idx);
+      raceWaypoints.col(i) = pos;
+    }
+  }
+
+  std::vector<double> timestamps;
+
+  timestamps.push_back(0.0);
+  for (int i = 0; i < raceDurations.size(); ++i) {
+    timestamps.push_back(timestamps.back() + raceDurations[i]);
+  }
+
+  std::ofstream file;
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
+  file.open(filename.c_str());
+  file.precision(4);
+
+  file << "waypoints: [";
+  for (int i{0}; i < raceWaypoints.cols(); ++i) {
+    if (i < raceWaypoints.cols() - 1) {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "],\n            ";
+    } else {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "timestamps: [";
+  for (int i{0}; i < timestamps.size(); ++i) {
+    if (i < timestamps.size() - 1) {
+      file << timestamps[i] << ",\n            ";
+    } else {
+      file << timestamps[i];
+    }
+  }
+  file << "]\n\n";
+
+  file << "durations: [";
+  for (int i{0}; i < raceDurations.size(); ++i) {
+    if (i < raceDurations.size() - 1) {
+      file << raceDurations[i] << ",\n            ";
+    } else {
+      file << raceDurations[i];
+    }
+  }
+  file << "]";
+
+  file.precision();
+  file.close();
+
+  return true;
+}
+
+
 bool MincoSnapTrajectory::saveSegments(const std::string &filename,
                                        const int piecesPerSegment) {
   if (!polys.valid()) {
@@ -178,6 +267,9 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename,
   const double nPieces = durations.size();
   const double nSegments = nPieces / piecesPerSegment;
 
+  std::cout << "nPieces: " << nPieces << std::endl;
+  std::cout << "nSegments: " << nSegments << std::endl;
+
   Eigen::VectorXd raceDurations;
   Eigen::Matrix3Xd raceWaypoints;
 
@@ -188,11 +280,13 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename,
     raceWaypoints.resize(3, nSegments - 1);
   }
 
+
+
   int idx{0};
   for (int i{0}; i < nSegments; ++i) {
     double dur = durations.segment(idx, piecesPerSegment).sum();
     raceDurations[i] = dur;
-
+    std::cout << "idx: " << idx << " dur: " << dur << std::endl;
     idx += piecesPerSegment;
     if (i < nSegments - 1) {
       Eigen::Vector3d pos = points.col(idx);
@@ -287,6 +381,7 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
     const Eigen::Vector4d &quat = setpoint.state.qx;
     const Eigen::Vector3d &omg = setpoint.input.omega;
     const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
+    // std::cout << "quat(0): " << quat(0) << std::endl;
     file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
          << "," << pos(1) << "," << pos(2) << "," << quat(1) << "," << quat(2)
          << "," << quat(3) << "," << quat(0) << "," << vel(0) << "," << vel(1)

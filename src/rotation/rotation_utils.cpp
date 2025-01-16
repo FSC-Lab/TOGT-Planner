@@ -266,7 +266,8 @@ double getHeading(Eigen::Ref<Eigen::Vector3d> acc, Eigen::Ref<Eigen::Vector3d> v
                   : lastTilt;
   lastTilt = q_pitch_roll;
 
-  const Eigen::Vector3d v_body = q_pitch_roll.inverse() * vel;
+  // const Eigen::Vector3d v_body = q_pitch_roll.inverse() * vel;
+  const Eigen::Vector3d v_body = vel;
   if ((v_body.x() * v_body.x() + v_body.y() * v_body.y()) > 1e-6) {
     heading = std::atan2(v_body.y(), v_body.x());
   } else {

@@ -57,6 +57,8 @@ public:
 
   void assignWaypoints(TrajData &tdata);
 
+  void resetSegments();
+
   bool load(const Yaml &yaml) override;
 
   bool load(const fs::path &filename) override;
