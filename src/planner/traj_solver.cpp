@@ -42,14 +42,28 @@ bool TrajSolver::solve(const PVAJ &initState,
   int total_dim = data.temporalVarDim + data.spatialVarDim;
   // std::cout << "total_dim: " << total_dim << std::endl;
 
+  // std::cout << "minco.A:\n" << minco.A << std::endl;
+  
+
   Eigen::Map<const Eigen::VectorXd> K(data.x.data(), data.temporalVarDim);
   Eigen::Map<const Eigen::VectorXd> D(data.x.data() + data.temporalVarDim, data.spatialVarDim);
   forwardT(K, data.T);
   forwardP(D, data.waypoints, data.P);
 
+
   status = static_cast<Status>(ret);
   minco.getTrajectory(data.traj);
 
+  // std::cout << "minco.A:\n" << minco.A_eigen << std::endl;
+  // std::cout << "minco.b:\n" << minco.b_eigen << std::endl;
+  // std::cout << "Point:\n" << data.P << std::endl;
+  // std::cout << "T:\n" << data.T << std::endl;
+
+  // std::cout << "minco.b solved:\n" << minco.b << std::endl;
+
+  Eigen::FullPivLU<Eigen::MatrixXd> lu(minco.A_eigen);
+  Eigen::MatrixXd x = lu.solve(minco.b_eigen);
+  // std::cout << "Eigen solved x:\n" << x << std::endl;
 
   return true;
 }
@@ -223,6 +237,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
   Eigen::Vector3d totalGradJer, totalGradSna, totalGradCra;
+  Eigen::Vector3d totalGradHeading;
   Eigen::Vector3d gradPos;
   Eigen::Vector3d gradVel;
   Eigen::Vector3d gradOmg;
@@ -262,30 +277,13 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
 
       /***********************************************/
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
       // penalty += quad.computeRobustSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
-      penalty += quad.computeRobustPenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
-      /***********************************************/
-
-
-      // if(!quad.toStateWithTiltYaw(0.0, pvajs, yaw, setpoint)){
-      //   continue;
-      // }
-
-      // penalty = 0.0;
-      // penalty += addVelocityPenalities(setpoint.state.v, params, gradVel);
-      // penalty += addRotationPenalities(setpoint.state.qx, params, gradQuat);
-      // penalty += addBodyratePenalities(setpoint.state.w, params, gradOmg);
-      // penalty += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-      // //TODO: not tested yet
-      // penalty += addBoundaryPenalities(setpoint.state.p, params, gradPos);
-
-      // quad.backPropagate(gradPos, gradVel, gradQuat, gradOmg,
-      //                         gradThrusts, totalGradPos, totalGradVel,
-      //                         totalGradAcc, totalGradJer, totalGradSna);
+      // penalty += quad.computeRobustPenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
       node = (j == 0 || j == numCheckPerPiece) ? 0.5 : 1.0;
       alpha = j * integralFrac;

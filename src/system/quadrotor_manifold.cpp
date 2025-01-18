@@ -18,6 +18,8 @@ QuadManifold::QuadManifold(const QuadParams params) : params_(params) {
   matThrust = params_.T_mb.leftCols(1);
 
   eps = std::numeric_limits<double>::epsilon();
+
+  initSingleThrCasadiFunc(params_);
 }
 
 QuadManifold::~QuadManifold() {}
@@ -79,30 +81,135 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
 }
 /****************************************************/
 double QuadManifold::computePenalityCost(
-    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+    const PVAJS &pvajs, const Eigen::Vector3d& heading, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
-    Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
+    Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna,
+    Eigen::Vector3d &gradTotalHeading) const {
   double cost{0.0};
-  Eigen::Vector3d gradPos;
-  Eigen::Vector3d gradVel;
-  Eigen::Vector3d gradOmg;
-  Eigen::Vector4d gradQuat;
-  Eigen::Vector4d gradThrusts;
-  Setpoint setpoint;
-  toStateWithTiltYaw(0.0, pvajs, yaw, setpoint);
+  Eigen::Vector3d gradPos{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradVel{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradOmg{Eigen::Vector3d::Zero()};
+  Eigen::Vector4d gradQuat{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d gradThrusts{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d gradPerceptionQuat{Eigen::Vector4d::Zero()};
+  gradTotalPos.setZero();
+  gradTotalVel.setZero();
+  gradTotalAcc.setZero();
+  gradTotalJer.setZero();
+  gradTotalSna.setZero();
+  gradTotalHeading.setZero();
 
-  cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
-  cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
-  cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
-  cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-  cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+  // Setpoint setpoint;
+  // toStateWithTiltYawMass(0.0, pvajs, heading, setpoint);
+  // cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
+  // cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
+  // cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
+  // cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
+  // cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
 
-  backPropagate(gradPos, gradVel, gradQuat, gradOmg,
-                          gradThrusts, gradTotalPos, gradTotalVel,
-                          gradTotalAcc, gradTotalJer, gradTotalSna);
+  // backPropagate(gradPos, gradVel, gradQuat, gradOmg,
+  //                         gradThrusts, gradTotalPos, gradTotalVel,
+  //                         gradTotalAcc, gradTotalJer, gradTotalSna);
+  // std::cout << "---------------Analytical gradient---------------" << std::endl;
+                      
+  // std::cout << "quat: " << setpoint.state.qx.transpose() << std::endl;
+  // std::cout << "omg: " << setpoint.state.w.transpose() << std::endl;
+  // std::cout << "thrusts: " << setpoint.input.thrusts.transpose() << std::endl;
+
+  // std::cout << "gradTotalAcc: " << gradTotalAcc.transpose() << std::endl;
+  // std::cout << "gradTotalJer: " << gradTotalJer.transpose() << std::endl;
+  // std::cout << "gradTotalSna: " << gradTotalSna.transpose() << std::endl;
+  // std::cout << "totalHeading: " << totalHeading.transpose() << std::endl;
+  /**************************** */
+  Setpoint setpoint_ad;
+
+  Eigen::Matrix<double, 11, 3> jacVel;
+  Eigen::Matrix<double, 11, 3> jacAcc;
+  Eigen::Matrix<double, 11, 3> jacJer;
+  Eigen::Matrix<double, 11, 3> jacSna;
+  Eigen::Matrix<double, 11, 3> jacHeading;
+  toStateWithTiltYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
+
+  cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
+  cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
+  cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
+  // cost += addPerceptionCost(setpoint_ad.state.qx, params. gradPerceptionQuat); 
+
+  gradTotalAcc =
+        (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
+        +
+        (gradOmg.transpose() * jacAcc.middleRows(4, 3)).transpose() // omg penalty
+        + gradThrusts(0) * jacAcc.row(7).transpose()   // thrust 1 penalty
+        + gradThrusts(1) * jacAcc.row(8).transpose()   // thrust 2 penalty
+        + gradThrusts(2) * jacAcc.row(9).transpose()   // thrust 3 penalty
+        + gradThrusts(3) * jacAcc.row(10).transpose(); // thrust 4 penalty
+
+  gradTotalJer =
+      (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose() // omg penalty
+      + gradThrusts(0) * jacJer.row(7).transpose()   // thrust 1 penalty
+      + gradThrusts(1) * jacJer.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacJer.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacJer.row(10).transpose(); // thrust 4 penalty
+
+  gradTotalSna =
+      gradThrusts(0) * jacSna.row(7).transpose()     // thrust 1 penalty
+      + gradThrusts(1) * jacSna.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacSna.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacSna.row(10).transpose(); // thrust 4 penalty
+
+  gradTotalHeading = 
+      (gradQuat.transpose() * jacHeading.topRows(4)).transpose() // quat penalty
+      +
+      (gradOmg.transpose() * jacHeading.middleRows(4, 3)).transpose() // omg penalty
+      + gradThrusts(0) * jacHeading.row(7).transpose() // thrust 1 penalty
+      + gradThrusts(1) * jacHeading.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacHeading.row(10).transpose(); // thrust 4 penalty
+
+  // std::cout << "---------------Autodiff gradient---------------" << std::endl;
+                      
+  // std::cout << "quat: " << setpoint_ad.state.qx.transpose() << std::endl;
+  // std::cout << "omg: " << setpoint_ad.state.w.transpose() << std::endl;
+  // std::cout << "thrusts: " << setpoint_ad.input.thrusts.transpose() << std::endl;
+
+  // std::cout << "gradTotalAcc: " << gradTotalAcc.transpose() << std::endl;
+  // std::cout << "gradTotalJer: " << gradTotalJer.transpose() << std::endl;
+  // std::cout << "gradTotalSna: " << gradTotalSna.transpose() << std::endl;
+  // std::cout << "totalHeading: " << totalHeading.transpose() << std::endl;
 
   return cost;
+
+
+// /*********Compute quadrotor full states*********/
+
+
+  
+// /*********Compute costs and their gradients*********/
+//   gradTotalPos.setZero();
+//   gradTotalVel.setZero();
+//   gradTotalAcc.setZero();
+//   gradTotalJer.setZero();
+//   gradTotalSna.setZero();
+
+//   double cost{0.0};
+//   Eigen::Vector3d gradPos = Eigen::Vector3d::Zero();
+//   Eigen::Vector3d gradVel = Eigen::Vector3d::Zero();
+//   Eigen::Vector3d gradOmg = Eigen::Vector3d::Zero();
+//   Eigen::Vector4d gradQuat = Eigen::Vector4d::Zero();
+//   Eigen::Vector4d gradThrusts = Eigen::Vector4d::Zero();
+
+//   cost += addVelocityPenalities(vel, params, gradVel);
+//   cost += addRotationPenalities(quat_tmp, params, gradQuat);
+//   cost += addBodyratePenalities(omg_tmp, params, gradOmg);
+//   cost += addThrustsPenalities(thrusts_tmp, params, gradThrusts);
+//   cost += addBoundaryPenalities(pos, params, gradPos);
+
+//   backPropagate(gradPos, gradVel, gradQuat, gradOmg,
+//                           gradThrusts, gradTotalPos, gradTotalVel,
+//                           gradTotalAcc, gradTotalJer, gradTotalSna);
+//   return cost;
+
 }
 
 double QuadManifold::computeSimplePenalityCost(
@@ -365,6 +472,23 @@ double QuadManifold::computeRobustSimplePenalityCost(
 
 
   return cost;
+}
+
+// TODO(chao): implement this function
+double QuadManifold::computePenalityCostAD(
+    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+    Eigen::Vector3d &gradTotalPos,
+    Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
+    Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna,
+    Eigen::Vector3d &gradToHeading) const {
+  double omg_xy_sqr{0.0}, omg_z_sqr{0.0}, thrust{0.0};
+  Eigen::Vector3d pos = pvajs.col(0);
+  Eigen::Vector3d vel = pvajs.col(1);  
+  Eigen::Vector3d acc = pvajs.col(2);
+  Eigen::Vector3d jer = pvajs.col(3);
+  Eigen::Vector3d sna = pvajs.col(4);
+
+  return true; 
 }
 
 double QuadManifold::computeRobustPenalityCost(
@@ -676,6 +800,35 @@ double QuadManifold::addBodyratePenalities(const Eigen::Vector3d &omg,
   return penalty;
 }
 
+double QuadManifold::addPerceptionPenality(const Eigen::Quaterniond &quad_orient, 
+                                           const Eigen::Quaterniond &gate_orient,
+                                           const TrajParams &params,
+                                           Eigen::Ref<Eigen::Vector4d> gradQuat) const {
+  // const double w = quat(0);
+  // const double x = quat(1);
+  // const double y = quat(2);
+  // const double z = quat(3);
+  double penalty{0.0};
+  gradQuat.setZero();
+
+  const Eigen::Quaterniond q_wc = quad_orient * params.q_bc;
+  const Eigen::Vector3d z_c = q_wc.toRotationMatrix().col(2);
+  const Eigen::Vector3d z_g = gate_orient.toRotationMatrix().col(2);
+
+  if (params.weightPerception <= 1.0e-6) {
+    return penalty;
+  }  
+
+  penalty = params.weightPerception * (1.0 - z_c.dot(z_g));
+  Eigen::Vector4d grad;
+  grad << 0.0, -0.5 * skew(z_c) * z_g; 
+  gradQuat += params.weightPerception * grad;
+
+  return penalty;
+                                 
+}
+
+
 double QuadManifold::addRotationPenalities(const Eigen::Vector4d &quat, 
                                   const TrajParams &params,
                                   Eigen::Ref<Eigen::Vector4d> gradQuat) const {
@@ -696,8 +849,6 @@ double QuadManifold::addRotationPenalities(const Eigen::Vector4d &quat,
 
   return penalty;
 }
-
-
 
 double QuadManifold::addBoundaryPenalities(const Eigen::Vector3d &pos, 
                                       const TrajParams &params,
@@ -953,13 +1104,237 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
     tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
     tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
 
-    // thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
-    thrusts = params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
+    thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
+    // thrusts = params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
   // }
 
 
   return true;
 }
+
+bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS &input,
+                          const Eigen::Vector3d &yaw, Setpoint &output) const {
+  output.state.t = t;
+  output.input.t = t;
+
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+
+  Eigen::Vector3d& omgInput = output.input.omega; 
+  Eigen::Vector4d& thrusts = output.input.thrusts; 
+  double& thrust = output.input.collective_thrust; 
+
+  pos = input.col(0);
+  vel = input.col(1);  
+  acc = input.col(2);
+  jer = input.col(3);
+  sna = input.col(4);
+
+  // double omg_xy_sqr{0.0}, omg_z_sqr{0.0};
+  // Eigen::Vector3d pos = pvajs.col(0);
+  // Eigen::Vector3d vel = pvajs.col(1);  
+  // Eigen::Vector3d acc = pvajs.col(2);
+  // Eigen::Vector3d jer = pvajs.col(3);
+  // Eigen::Vector3d sna = pvajs.col(4);
+  
+  a0 = acc(0);
+  a1 = acc(1);
+  a2 = acc(2);
+  j0 = jer(0);
+  j1 = jer(1);
+  j2 = jer(2);
+  s0 = sna(0);
+  s1 = sna(1);
+  s2 = sna(2);
+  const double psi = yaw(0);
+  const double dpsi = yaw(1);
+  const double ddpsi = yaw(2);
+
+  c_half_psi = cos(0.5 * psi);
+  s_half_psi = sin(0.5 * psi);
+  c_psi = cos(psi);
+  s_psi = sin(psi);
+
+  // alpha = a + gzW
+  alpha0 = a0;
+  alpha1 = a1;
+  alpha2 = a2 + G;
+  alpha << alpha0, alpha1, alpha2;
+
+  alpha_sqr0 = alpha0 * alpha0;
+  alpha_sqr1 = alpha1 * alpha1;
+  alpha_sqr2 = alpha2 * alpha2;
+  alpha_norm_2 = alpha_sqr0 + alpha_sqr1 + alpha_sqr2;
+  alpha_norm_1 = sqrt(alpha_norm_2);
+  alpha_norm_3 = alpha_norm_2 * alpha_norm_1;
+  alpha_norm_5 = alpha_norm_2 * alpha_norm_3;
+  alpha_norm_7 = alpha_norm_2 * alpha_norm_5;
+  alpha_dot_j = alpha0 * j0 + alpha1 * j1 + alpha2 * j2;
+  alpha_dot_j_sqr = alpha_dot_j * alpha_dot_j;
+  alpha_dot_s = alpha0 * s0 + alpha1 * s1 + alpha2 * s2;
+  j_norm_2 = j0 * j0 + j1 * j1 + j2 * j2;
+
+  mat_DNalphas_a = -sna * alpha.transpose() / alpha_norm_3 - (alpha * sna.transpose() + I33 * alpha_dot_s) / alpha_norm_3 + alpha * alpha.transpose() * 3 * alpha_dot_s / alpha_norm_5;
+
+  // zB = N(a+gzW)
+  zB0 = alpha0 / alpha_norm_1;
+  zB1 = alpha1 / alpha_norm_1;
+  zB2 = alpha2 / alpha_norm_1;
+  zB << zB0, zB1, zB2;
+
+  thrust = zB0 * params_.mass * a0 
+                    + zB1 * params_.mass * a1
+                    + zB2 * params_.mass * (a2 + G);
+  zB2_1 = zB2 + 1;
+
+  alpha01 = alpha0 * alpha1;
+  alpha12 = alpha1 * alpha2;
+  alpha02 = alpha0 * alpha2;
+
+  ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
+  ng01 = -alpha01 / alpha_norm_3;
+  ng02 = -alpha02 / alpha_norm_3;
+  ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
+  ng12 = -alpha12 / alpha_norm_3;
+  ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
+
+  DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
+
+  // dzB
+  dzB = DN_alpha * jer;
+  dzB0 = dzB(0);
+  dzB1 = dzB(1);
+  dzB2 = dzB(2);
+  dzB2_sqr = dzB2 * dzB2;
+
+  // ddzB
+  DN_alpha_s = DN_alpha * sna;
+  ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 - alpha * j_norm_2 / alpha_norm_3 + alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
+  ddzB0 = ddzB(0);
+  ddzB1 = ddzB(1);
+  ddzB2 = ddzB(2);
+
+  mat_zB_a = DN_alpha;
+  mat_dzB_j = DN_alpha;
+  mat_ddzB_s = DN_alpha;
+
+  mat_dzB_a = -jer * alpha.transpose() / alpha_norm_3 - (alpha * jer.transpose() + I33 * alpha_dot_j) / alpha_norm_3 + alpha * alpha.transpose() * 3 * alpha_dot_j / alpha_norm_5;
+  mat_ddzB_j = -(jer * alpha.transpose() + alpha * jer.transpose() + I33 * alpha_dot_j) * 2 / alpha_norm_3 + alpha * alpha.transpose() * 6 * alpha_dot_j / alpha_norm_5;
+  mat_ddzB_a = -(I33 * j_norm_2 + jer * jer.transpose() * 2.0) / alpha_norm_3 + ((jer * alpha.transpose() + alpha * jer.transpose()) * 6 * alpha_dot_j + alpha * alpha.transpose() * 3 * j_norm_2 + I33 * 3 * alpha_dot_j_sqr) / alpha_norm_5 - (alpha * alpha.transpose() * 15 * alpha_dot_j_sqr) / alpha_norm_7 + mat_DNalphas_a;
+
+  // quaternion
+  tilt_den_2 = 2.0 * (zB2_1);
+  tilt_den = sqrt(tilt_den_2);
+  tilt_den_3 = tilt_den_2 * tilt_den;
+
+  tilt0 = 0.5 * tilt_den;
+  tilt1 = -zB1 / tilt_den;
+  tilt2 = zB0 / tilt_den;
+
+  quat_tmp(0) = tilt0 * c_half_psi;
+  quat_tmp(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
+  quat_tmp(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
+  quat_tmp(3) = tilt0 * s_half_psi;
+  quat = quat_tmp;
+
+  // bodyrate
+  omg_den = zB2_1;
+  omg_den_2 = omg_den * omg_den;
+  omg_den_4 = omg_den_2 * omg_den_2;
+
+  omg_term = dzB2 / omg_den;
+  tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
+  tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
+  tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
+
+  omg_tmp(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
+  omg_tmp(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
+  omg_tmp(2) = tmp_omg_3 / omg_den + dpsi;
+  omg = omg_tmp;
+  omgInput = omg;
+
+  // derivative of torque w.r.t. omg
+  mat_tor_w << 0.0, inertiaGapZY * omg_tmp(2), inertiaGapZY * omg_tmp(1),
+                inertiaGapXZ * omg_tmp(2), 0.0, inertiaGapXZ * omg_tmp(0),
+                inertiaGapYX * omg_tmp(1), inertiaGapYX * omg_tmp(0), 0.0;
+
+  // body acceleration
+  tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
+  tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
+  tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
+
+  omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den - dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
+  omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den - dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
+  omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
+
+  //TODO: the correct expression leads to a worse result...
+  tau_tmp(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
+  tau_tmp(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
+  tau_tmp(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
+  tau = tau_tmp;
+  // tau_tmp.setZero(); //TODO: in this case, the collective thrust is constrained indeed
+
+  thrusts_tmp = params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
+  thrusts = thrusts_tmp;
+  return true;
+}
+
+bool QuadManifold::toStateWithTiltYawAD(const double t, const PVAJS &input,
+                          const Eigen::Vector3d &heading, Setpoint &output,
+                          Eigen::Matrix<double, 11, 3> &jacVel,
+                          Eigen::Matrix<double, 11, 3> &jacAcc,
+                          Eigen::Matrix<double, 11, 3> &jacJer,
+                          Eigen::Matrix<double, 11, 3> &jacSna,
+                          Eigen::Matrix<double, 11, 3> &jacHeading) const {
+  output.state.t = t;
+  output.input.t = t;
+
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+
+  Eigen::Vector3d& omgInput = output.input.omega; 
+  Eigen::Vector4d& thrusts = output.input.thrusts; 
+  double& thrust = output.input.collective_thrust; 
+
+  pos = input.col(0);
+  vel = input.col(1);  
+  acc = input.col(2);
+  jer = input.col(3);
+  sna = input.col(4);
+
+  jacVel.setZero();
+  jacAcc.setZero();
+  jacJer.setZero();
+  jacSna.setZero();
+  jacHeading.setZero();
+  Eigen::Vector4d quat_tmp;
+  Eigen::Vector3d omg_tmp;
+  Eigen::Vector4d thrusts_tmp;
+  forwardSingleThrAD(vel, acc, jer, sna, heading, quat_tmp, omg_tmp, thrusts_tmp, jacVel,
+                                jacAcc, jacJer, jacSna, jacHeading);
+  quat = quat_tmp;
+  omg = omg_tmp;                              
+  omgInput = omg_tmp;
+  thrusts = thrusts_tmp;
+  thrust = thrusts.sum() / params_.mass;
+
+  return true;
+
+}
+
+
 
 void QuadManifold::backPropagate(
     const Eigen::Vector3d &gradPos, const Eigen::Vector3d &gradVel,

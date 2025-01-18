@@ -12,6 +12,7 @@ bool RacePlanner::solve(std::shared_ptr<RaceTrack> track,
                         const TrajParams &tparams, const LbfgsParams &lbfgs) {
   ready_ = solver_.solve(track->initState.toPVAJ(), track->endState.toPVAJ(),
                        quad_, tparams, lbfgs);
+
   return ready_;       
 }
 

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DROLIB_SOLVER_MINCO_SNAP_4D_HPP_
+#define DROLIB_SOLVER_MINCO_SNAP_4D_HPP_
 
 #include <Eigen/Eigen>
 #include <cmath>
@@ -9,19 +10,19 @@
 namespace drolib {
 
 // MINCO for s=4 and non-uniform time
-class MincoSnap {
+class MincoSnap4D {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  MincoSnap() = default;
-  ~MincoSnap() { A.destroy(); }
+  MincoSnap4D() = default;
+  ~MincoSnap4D() { A.destroy(); }
   Eigen::MatrixXd A_eigen;
-  Eigen::MatrixX3d b_eigen;
+  Eigen::MatrixX4d b_eigen;
  public:
   int N;
-  Eigen::Matrix<double, 3, 4> headPVAJ;
-  Eigen::Matrix<double, 3, 4> tailPVAJ;
+  Eigen::Matrix<double, 4, 4> headPVAJ;
+  Eigen::Matrix<double, 4, 4> tailPVAJ;
   BandedSystem A;
-  Eigen::MatrixX3d b;
+  Eigen::MatrixX4d b;
   Eigen::VectorXd T1;
   Eigen::VectorXd T2;
   Eigen::VectorXd T3;
@@ -31,8 +32,8 @@ class MincoSnap {
   Eigen::VectorXd T7;
 
  public:
-  void setConditions(const Eigen::Matrix<double, 3, 4> &headState,
-                     const Eigen::Matrix<double, 3, 4> &tailState,
+  void setConditions(const Eigen::Matrix<double, 4, 4> &headState,
+                     const Eigen::Matrix<double, 4, 4> &tailState,
                      const int &pieceNum) {
     N = pieceNum;
     headPVAJ = headState;
@@ -40,8 +41,8 @@ class MincoSnap {
     A.create(8 * N, 8, 8);
     A_eigen.resize(8 * N, 8 * N);
     A_eigen.setZero();
-    b.resize(8 * N, 3);
-    b_eigen.resize(8 * N, 3);
+    b.resize(8 * N, 4);
+    b_eigen.resize(8 * N, 4);
     T1.resize(N);
     T2.resize(N);
     T3.resize(N);
@@ -62,9 +63,7 @@ class MincoSnap {
     T7 = T4.cwiseProduct(T3);
 
     A.reset();
-    A_eigen.setZero();
     b.setZero();
-    b_eigen.setZero();
 
     A(0, 0) = 1.0;
     A(1, 1) = 1.0;
@@ -256,23 +255,22 @@ class MincoSnap {
     b_eigen.row(8 * N - 2) = tailPVAJ.col(2).transpose();
     b_eigen.row(8 * N - 1) = tailPVAJ.col(3).transpose();
 
-
     A.factorizeLU();
     A.solve(b);
 
     return;
   }
 
-  void getTrajectory(PiecewisePolynomial<7> &polys) const {
-    polys.clear();
-    for (int i = 0; i < N; i++) {
-      polys.emplace_back(
-          T1(i), b.block<8, 3>(8 * i, 0).transpose().rowwise().reverse());
-    }
-    return;
-  }
+  // void getTrajectory(PiecewisePolynomial<7> &polys) const {
+  //   polys.clear();
+  //   for (int i = 0; i < N; i++) {
+  //     polys.emplace_back(
+  //         T1(i), b.block<8, 3>(8 * i, 0).transpose().rowwise().reverse());
+  //   }
+  //   return;
+  // }
 
-  void getEnergyWithGrads(double &energy, Eigen::MatrixX3d &gdC,
+  void getEnergyWithGrads(double &energy, Eigen::MatrixX4d &gdC,
                           Eigen::VectorXd &gdT) const {
     getEnergy(energy);
     getEnergyPartialGradByCoeffs(gdC);
@@ -296,10 +294,11 @@ class MincoSnap {
     return;
   }
 
-  const Eigen::MatrixX3d &getCoeffs(void) const { return b; }
+  const Eigen::MatrixX4d &getCoeffs(void) const { return b; }
 
-  void getEnergyPartialGradByCoeffs(Eigen::MatrixX3d &gdC) const {
-    // gdC.resize(8 * N, 3);
+
+  void getEnergyPartialGradByCoeffs(Eigen::MatrixX4d &gdC) const {
+    gdC.resize(8 * N, 4);
     for (int i = 0; i < N; i++) {
       gdC.row(8 * i + 7) = 10080.0 * b.row(8 * i + 4) * T4(i) +
                            40320.0 * b.row(8 * i + 5) * T5(i) +
@@ -317,10 +316,11 @@ class MincoSnap {
                            2880.0 * b.row(8 * i + 5) * T2(i) +
                            5760.0 * b.row(8 * i + 6) * T3(i) +
                            10080.0 * b.row(8 * i + 7) * T4(i);
-      gdC.block<4, 3>(8 * i, 0).setZero();
+      gdC.block<4, 4>(8 * i, 0).setZero();
     }
     return;
   }
+
 
   void getEnergyPartialGradByTimes(Eigen::VectorXd &gdT) const {
     // gdT.resize(N);
@@ -339,12 +339,12 @@ class MincoSnap {
     return;
   }
 
-  void propagateGrad(const Eigen::MatrixX3d &partialGradByCoeffs,
+void propagateGrad(const Eigen::MatrixX3d &partialGradByCoeffs,
                      const Eigen::VectorXd &partialGradByTimes,
                      Eigen::Matrix3Xd &gradByPoints,
                      Eigen::VectorXd &gradByTimes) {
-    // gradByPoints.resize(3, N - 1);
-    // gradByTimes.resize(N);
+    gradByPoints.resize(4, N - 1);
+    gradByTimes.resize(N);
     Eigen::MatrixX3d adjGrad = partialGradByCoeffs;
     A.solveAdj(adjGrad);
 
@@ -352,8 +352,8 @@ class MincoSnap {
       gradByPoints.col(i) = adjGrad.row(8 * i + 7).transpose();
     }
 
-    Eigen::Matrix<double, 8, 3> B1;
-    Eigen::Matrix<double, 4, 3> B2;
+    Eigen::Matrix<double, 8, 4> B1;
+    Eigen::Matrix<double, 4, 4> B2;
     for (int i = 0; i < N - 1; i++) {
       // negative velocity
       B1.row(3) =
@@ -392,7 +392,7 @@ class MincoSnap {
       // negative dd_crackle
       B1.row(2) = -5040.0 * b.row(i * 8 + 7);
 
-      gradByTimes(i) = B1.cwiseProduct(adjGrad.block<8, 3>(8 * i + 4, 0)).sum();
+      gradByTimes(i) = B1.cwiseProduct(adjGrad.block<8, 4>(8 * i + 4, 0)).sum();
     }
 
     // negative velocity
@@ -423,9 +423,12 @@ class MincoSnap {
           840.0 * T3(N - 1) * b.row(8 * N - 1));
 
     gradByTimes(N - 1) =
-        B2.cwiseProduct(adjGrad.block<4, 3>(8 * N - 4, 0)).sum();
+        B2.cwiseProduct(adjGrad.block<4, 4>(8 * N - 4, 0)).sum();
     gradByTimes += partialGradByTimes;
   }
-};
 
+};
 }  // namespace drolib
+
+
+#endif  /* DROLIB_SOLVER_MINCO_SNAP_4D_HPP_ */

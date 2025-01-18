@@ -7,7 +7,18 @@ namespace drolib {
 
 class TrajParams : public ParameterBase {
  public:
-  TrajParams() = default;
+  TrajParams() {
+    maxVelSqr = maxVelNorm * maxVelNorm;
+    maxOmgXYSqr = maxOmgXY * maxOmgXY;
+    maxOmgZSqr = maxOmgZ * maxOmgZ;
+    thrMean = 0.5 * (maxThr + minThr);
+    thrRadi = 0.5 * (maxThr - minThr);
+    thrRadiSqr = thrRadi * thrRadi;
+  
+    collectivtThrMean = 4.0 * thrMean;
+    collectivtThrRadi = 4.0 * thrRadi;
+    collectivtThrRadiSqr = collectivtThrRadi * collectivtThrRadi;    
+  }
 
   using ParameterBase::load;
   bool load(const Yaml& yaml) override;
@@ -16,30 +27,31 @@ class TrajParams : public ParameterBase {
   friend std::ostream& operator<<(std::ostream& os, const TrajParams& params);
 
  public:
-  int piecesPerSegment{};
-  double speedGuess{};
+  int piecesPerSegment{2};
+  double speedGuess{1};
 
-  double maxVelNorm{};
-  double maxOmgXY{};
-  double maxOmgZ{};
-  double maxTiltedAngle{};
-  double maxThr{};
-  double minThr{};
+  double maxVelNorm{100};
+  double maxOmgXY{15};
+  double maxOmgZ{3};
+  double maxTiltedAngle{6.28};
+  double maxThr{6.88};
+  double minThr{0.1};
 
-  double weightTime{};
-  double weightEnergy{};
-  double weightPos{};
-  double weightVel{};
-  double weightOmg{};
-  double weightRot{};
-  double weightThr{};
+  double weightTime{1.0};
+  double weightEnergy{0.1};
+  double weightPos{1.0};
+  double weightVel{1.0};
+  double weightOmg{1.0};
+  double weightRot{1.0};
+  double weightThr{1.0};
+  double weightPerception{0.0};
 
-  double smoothingEps{};
-  int numConstPena{};
+  double smoothingEps{1.0e-2};
+  int numConstPena{16};
   bool dynamicConstCheck{false};
-  int minNumCheck{};
-  int maxNumCheck{};
-  double checkTimeSec{};
+  int minNumCheck{8};
+  int maxNumCheck{32};
+  double checkTimeSec{0.05};
 
   double maxVelSqr{};
   double maxOmgXYSqr{};
@@ -52,9 +64,12 @@ class TrajParams : public ParameterBase {
   double collectivtThrRadi{};
   double collectivtThrRadiSqr{};
 
-  Eigen::Vector2d boundX;
-  Eigen::Vector2d boundY;
-  Eigen::Vector2d boundZ;
+  Eigen::Vector2d boundX{-10000,10000};
+  Eigen::Vector2d boundY{-10000,10000};
+  Eigen::Vector2d boundZ{-10000,10000};
+
+  Eigen::Quaterniond q_bc{Eigen::Quaterniond::Identity()};
+  Eigen::Vector3d t_b_cb{Eigen::Vector3d::Zero()};
 };
 
 }  // namespace drolib

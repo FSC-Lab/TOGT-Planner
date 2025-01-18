@@ -4,10 +4,29 @@ catkin_simple()
 
 add_definitions(-std=c++17)
 
+# for using casadi
+find_package(casadi REQUIRED)
+set(CASADI_INCLUDE_DIR /usr/local/include/casadi)
+# find casadi library
+find_library(CASADI_LIBRARY
+    NAMES casadi
+    HINTS ${CASADI_INCLUDE_DIR}/../lib $ENV{CASADI_PREFIX}/lib)
+if(CASADI_LIBRARY)
+    set(CASADI_LIBRARIES ${CASADI_LIBRARIES} ${CASADI_LIBRARY})
+endif()
+
+
 cs_add_library(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(${PROJECT_NAME}
+  PUBLIC
   ${catkin_LIBRARIES}
+  casadi
 )
+target_include_directories(${PROJECT_NAME}
+  PUBLIC 
+  ${CASADI_INCLUDE_DIR}
+)
+
 
 target_compile_options(${PROJECT_NAME} PRIVATE
   -fno-finite-math-only

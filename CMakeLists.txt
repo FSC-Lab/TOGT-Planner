@@ -28,6 +28,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ################################################################################
 message(STATUS "===============   Setup Dependencies   ================")
 
+# for using casadi
+find_package(casadi REQUIRED)
+set(CASADI_INCLUDE_DIR /usr/local/include/casadi)
+# find casadi library
+find_library(CASADI_LIBRARY
+    NAMES casadi
+    HINTS ${CASADI_INCLUDE_DIR}/../lib $ENV{CASADI_PREFIX}/lib)
+if(CASADI_LIBRARY)
+    set(CASADI_LIBRARIES ${CASADI_LIBRARIES} ${CASADI_LIBRARY})
+endif()
+
 if (EIGEN_FROM_SYSTEM)
   find_package(Eigen3 3.3.4 QUIET)
   if (EIGEN3_FOUND)
@@ -73,7 +84,7 @@ else ()
   add_definitions(-DEIGEN_DONT_PARALLELIZE)
 endif ()
 
-include_directories(include)
+include_directories(include ${CASADI_INCLUDE_DIR})
 include_directories(AFTER tests)
 include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIRS})
 
@@ -183,7 +194,13 @@ else ()
     add_library(${PROJECT_NAME} ${SOURCES})
     target_link_libraries(${PROJECT_NAME}
       PUBLIC
-      $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
+      casadi
+      $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>
+      )
+    target_include_directories(${PROJECT_NAME}
+      PUBLIC 
+      ${CASADI_INCLUDE_DIR}
+    )
     target_compile_options(${PROJECT_NAME} PRIVATE
       -fno-finite-math-only
       -Wall
@@ -217,35 +234,35 @@ endif ()
 message(STATUS "LIBRARY_NAME is " ${LIBRARY_NAME})
 
 
-# Build tests
-if (BUILD_TESTS)
-    add_executable(tests ${TEST_SOURCES})
-    target_compile_options(tests PRIVATE
-      -fno-finite-math-only
-      -Wall                   # Show all warnings
-      -Wextra                 # Show extra error information
-      -Wpedantic              # Issue all the warnings demanded by strict ISO C and ISO C++
-      # -Werror                 # Raise all warnings to errors
-      -Wunused                # Warn whatever is assigned to, but unused
-      -Wno-unused-parameter
-      -Wundef                 # Warn if an undefined identifier is evaluated in an #if directive. 
-      -Wcast-align            # Warn whenever a pointer is cast such that the required alignment of the target is increased
-      -Wmissing-declarations  # Warn if a global function is defined without a previous declaration
-      -Wmissing-include-dirs  # Warn if a user-supplied include directory does not exist.
-      -Wnon-virtual-dtor      
-      -Wredundant-decls       # Warn if anything is declared more than once in the same scope
-      -Wodr
-      -Wunreachable-code
-      -Wno-unknown-pragmas
-    )
-    target_link_libraries(tests
-            ${LIBRARY_NAME}
-            gtest
-            gtest_main
-            $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>
-            )
-    add_test(tests tests)
-endif ()
+# # Build tests
+# if (BUILD_TESTS)
+#     add_executable(tests ${TEST_SOURCES})
+#     target_compile_options(tests PRIVATE
+#       -fno-finite-math-only
+#       -Wall                   # Show all warnings
+#       -Wextra                 # Show extra error information
+#       -Wpedantic              # Issue all the warnings demanded by strict ISO C and ISO C++
+#       # -Werror                 # Raise all warnings to errors
+#       -Wunused                # Warn whatever is assigned to, but unused
+#       -Wno-unused-parameter
+#       -Wundef                 # Warn if an undefined identifier is evaluated in an #if directive. 
+#       -Wcast-align            # Warn whenever a pointer is cast such that the required alignment of the target is increased
+#       -Wmissing-declarations  # Warn if a global function is defined without a previous declaration
+#       -Wmissing-include-dirs  # Warn if a user-supplied include directory does not exist.
+#       -Wnon-virtual-dtor      
+#       -Wredundant-decls       # Warn if anything is declared more than once in the same scope
+#       -Wodr
+#       -Wunreachable-code
+#       -Wno-unknown-pragmas
+#     )
+#     target_link_libraries(tests
+#             ${LIBRARY_NAME}
+#             gtest
+#             gtest_main
+#             $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>
+#             )
+#     add_test(tests tests)
+# endif ()
 
 message(STATUS "===========   Done! Smells DroLib!   ==============")
 

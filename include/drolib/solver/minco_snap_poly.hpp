@@ -333,4 +333,3 @@ class MincoSnapPoly {
 
 #endif  /* DROLIB_SOLVER_MINCO_SNAP_POLY_HPP_ */
 
-

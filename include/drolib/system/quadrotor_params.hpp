@@ -9,7 +9,15 @@ namespace drolib {
 class QuadParams : public ParameterBase {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  QuadParams() = default;
+  QuadParams() {
+    
+    T_bm = (Eigen::Matrix4d() << 
+                Eigen::Vector4d::Ones().transpose(), 
+                Eigen::Vector4d(-1,  1, -1, 1).transpose(),
+                Eigen::Vector4d(-1,  1, 1, -1).transpose(),
+                Eigen::Vector4d(-1, -1, 1, 1).transpose()).finished();
+    T_mb = T_bm.inverse();            
+  }
 
   using ParameterBase::load;
   bool load(const Yaml& yaml) override;
@@ -18,9 +26,9 @@ class QuadParams : public ParameterBase {
 
  public:
   std::string name{""};
-  double mass{NAN};
+  double mass{1.0};
   // double gravity{9.8066};
-  Eigen::Vector3d inertia;
+  Eigen::Vector3d inertia{0.001, 0.001, 0.0017};
   // Eigen::Matrix4d T_mb;
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> T_mb;
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> T_bm;
