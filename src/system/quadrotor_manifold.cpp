@@ -4,22 +4,23 @@ namespace drolib {
   
 QuadManifold::QuadManifold() {}
 
-QuadManifold::QuadManifold(const QuadParams params) : params_(params) {
+QuadManifold::QuadManifold(const QuadParams params) : quad_params_(params) {
   mat_tor_dw.setZero();
-  mat_tor_dw(0, 0) = params_.inertia.x();
-  mat_tor_dw(1, 1) = params_.inertia.y();
-  mat_tor_dw(2, 2) = params_.inertia.z();
+  mat_tor_dw(0, 0) = quad_params_.inertia.x();
+  mat_tor_dw(1, 1) = quad_params_.inertia.y();
+  mat_tor_dw(2, 2) = quad_params_.inertia.z();
 
-  inertiaGapZY = params_.inertia.z() - params_.inertia.y();
-  inertiaGapXZ = params_.inertia.x() - params_.inertia.z();
-  inertiaGapYX = params_.inertia.y() - params_.inertia.x();
+  inertiaGapZY = quad_params_.inertia.z() - quad_params_.inertia.y();
+  inertiaGapXZ = quad_params_.inertia.x() - quad_params_.inertia.z();
+  inertiaGapYX = quad_params_.inertia.y() - quad_params_.inertia.x();
 
-  matTorque = params_.T_mb.rightCols(3);
-  matThrust = params_.T_mb.leftCols(1);
+  matTorque = quad_params_.T_mb.rightCols(3);
+  matThrust = quad_params_.T_mb.leftCols(1);
 
   eps = std::numeric_limits<double>::epsilon();
 
-  initSingleThrCasadiFunc(params_);
+  initSingleThrCasadiFunc(quad_params_);
+  initPerceptionCostCasadiFunc(quad_params_);
 }
 
 QuadManifold::~QuadManifold() {}
@@ -55,9 +56,9 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
   const double& yawRate = yaw(1);
 
   const Eigen::Vector3d accCmd = acc - GVEC;
-  // collective_thrust = accCmd.norm() * params_.mass;
+  // collective_thrust = accCmd.norm() * quad_params_.mass;
   collective_thrust = accCmd.norm(); // thrust-mass ratio
-  thrusts.setConstant(params_.mass *  collective_thrust / 4.0);
+  thrusts.setConstant(quad_params_.mass *  collective_thrust / 4.0);
 
   const Eigen::Quaterniond q_c(Eigen::Quaterniond(Eigen::AngleAxis<double>(yawAng, Eigen::Vector3d::UnitZ())));
   const Eigen::Vector3d x_c = q_c * Eigen::Vector3d::UnitX();
@@ -134,7 +135,19 @@ double QuadManifold::computePenalityCost(
   cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
   cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
   cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
-  // cost += addPerceptionCost(setpoint_ad.state.qx, params. gradPerceptionQuat); 
+
+  // double objective = computePerceptionCost(setpoint_ad.state.qx, gradPerceptionQuat);
+  // std::cout << "------------------" << std::endl;
+  // std::cout << "objective: " << objective << std::endl;
+  // std::cout << "gradPerceptionQuat: " << gradPerceptionQuat.transpose() << std::endl;
+  
+  // // Eigen::Quaterniond quad_orient = setpoint_ad.state.q();
+  // // Eigen::Quaterniond gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-90,0,-90)));
+  
+  // // objective = addPerceptionCost(setpoint_ad.state.q(), quad_params_.gate_orient, quad_params_, params, gradPerceptionQuat); 
+  // // std::cout << "objective: " << objective << std::endl;
+  // // std::cout << "gradPerceptionQuat: " << gradPerceptionQuat.transpose() << std::endl;
+  // gradPerceptionQuat.setZero();
 
   gradTotalAcc =
         (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
@@ -143,7 +156,9 @@ double QuadManifold::computePenalityCost(
         + gradThrusts(0) * jacAcc.row(7).transpose()   // thrust 1 penalty
         + gradThrusts(1) * jacAcc.row(8).transpose()   // thrust 2 penalty
         + gradThrusts(2) * jacAcc.row(9).transpose()   // thrust 3 penalty
-        + gradThrusts(3) * jacAcc.row(10).transpose(); // thrust 4 penalty
+        + gradThrusts(3) * jacAcc.row(10).transpose()  // thrust 4 penalty
+        + (gradPerceptionQuat.transpose() * jacAcc.topRows(4)).transpose(); // perception cost
+
 
   gradTotalJer =
       (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose() // omg penalty
@@ -165,7 +180,9 @@ double QuadManifold::computePenalityCost(
       + gradThrusts(0) * jacHeading.row(7).transpose() // thrust 1 penalty
       + gradThrusts(1) * jacHeading.row(8).transpose()   // thrust 2 penalty
       + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
-      + gradThrusts(3) * jacHeading.row(10).transpose(); // thrust 4 penalty
+      + gradThrusts(3) * jacHeading.row(10).transpose() // thrust 4 penalty
+      + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose(); // perception cost
+
 
   // std::cout << "---------------Autodiff gradient---------------" << std::endl;
                       
@@ -307,9 +324,9 @@ double QuadManifold::computeRobustSimplePenalityCost(
   zB2 = alpha2 / alpha_norm_1;
   zB << zB0, zB1, zB2;
 
-  thrust = zB0 * params_.mass * a0 
-                    + zB1 * params_.mass * a1
-                    + zB2 * params_.mass * (a2 + G);
+  thrust = zB0 * quad_params_.mass * a0 
+                    + zB1 * quad_params_.mass * a1
+                    + zB2 * quad_params_.mass * (a2 + G);
   zB2_1 = zB2 + 1;
 
   if (fabs(zB2_1) > 0.001) {
@@ -373,7 +390,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
 
   } else {
 
-    double c = thrust / params_.mass;
+    double c = thrust / quad_params_.mass;
     double c_inv = 1.0 / c;
     double c_inv_2 = c_inv * c_inv;
 
@@ -421,7 +438,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
     d_Cw_a = gradOmg.transpose() * (mat_w_zB * mat_zB_a + mat_w_dzB * mat_dzB_a);
     d_Cw_j = gradOmg.transpose() * (mat_w_dzB * mat_dzB_j);
 
-    d_Cf_a = gradThrust * params_.mass * zB.transpose();
+    d_Cf_a = gradThrust * quad_params_.mass * zB.transpose();
     
     //TODO: no rotation in penality
     gradTotalAcc = d_Cw_a + d_Cf_a;
@@ -454,7 +471,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
     cost += addThrustPenality(thrust, params, gradThrust);
 
     //Cost 1
-    double c = thrust / params_.mass;
+    double c = thrust / quad_params_.mass;
     double c_inv = 1.0 / c;
     double c_inv_2 = c_inv * c_inv;
     double c_inv_3 = c_inv_2 * c_inv;
@@ -464,7 +481,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
     Eigen::Vector3d d_c_a = zB;
     Eigen::Vector3d d_Cwxysqr_a = d_c_a * d_Cwxysqr_c;
     //Cost 3
-    d_Cf_a = gradThrust * params_.mass * zB.transpose();
+    d_Cf_a = gradThrust * quad_params_.mass * zB.transpose();
     
     gradTotalAcc = d_Cwxysqr_a + d_Cf_a;
     gradTotalJer = d_Cwxysqr_j;
@@ -550,9 +567,9 @@ double QuadManifold::computeRobustPenalityCost(
   zB2 = alpha2 / alpha_norm_1;
   zB << zB0, zB1, zB2;
 
-  thrust = zB0 * params_.mass * a0 
-                    + zB1 * params_.mass * a1
-                    + zB2 * params_.mass * (a2 + G);
+  thrust = zB0 * quad_params_.mass * a0 
+                    + zB1 * quad_params_.mass * a1
+                    + zB2 * quad_params_.mass * (a2 + G);
   zB2_1 = zB2 + 1;
 
   if (fabs(zB2_1) > 0.001) {
@@ -634,16 +651,16 @@ double QuadManifold::computeRobustPenalityCost(
     omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
 
     //TODO: the correct expression leads to a worse result...
-    tau_tmp(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
-    tau_tmp(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
-    tau_tmp(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
+    tau_tmp(0) = quad_params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
+    tau_tmp(1) = quad_params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
+    tau_tmp(2) = quad_params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
     // tau_tmp.setZero(); //TODO: in this case, the collective thrust is constrained indeed
 
-    thrusts_tmp = params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
+    thrusts_tmp = quad_params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
 
   } else {
 
-    double c = thrust / params_.mass;
+    double c = thrust / quad_params_.mass;
     double c_inv = 1.0 / c;
     double c_inv_2 = c_inv * c_inv;
 
@@ -696,7 +713,7 @@ double QuadManifold::computeRobustPenalityCost(
     cost += addThrustPenality(thrust, params, gradThrust);
 
     //Cost 1
-    double c = thrust / params_.mass;
+    double c = thrust / quad_params_.mass;
     double c_inv = 1.0 / c;
     double c_inv_2 = c_inv * c_inv;
     double c_inv_3 = c_inv_2 * c_inv;
@@ -706,7 +723,7 @@ double QuadManifold::computeRobustPenalityCost(
     Eigen::Vector3d d_c_a = zB;
     Eigen::Vector3d d_Cwxysqr_a = d_c_a * d_Cwxysqr_c;
     //Cost 3
-    d_Cf_a = gradThrust * params_.mass * zB.transpose();
+    d_Cf_a = gradThrust * quad_params_.mass * zB.transpose();
     
     gradTotalAcc = d_Cwxysqr_a + d_Cf_a;
     gradTotalJer = d_Cwxysqr_j;
@@ -800,8 +817,9 @@ double QuadManifold::addBodyratePenalities(const Eigen::Vector3d &omg,
   return penalty;
 }
 
-double QuadManifold::addPerceptionPenality(const Eigen::Quaterniond &quad_orient, 
+double QuadManifold::addPerceptionCost(const Eigen::Quaterniond &quad_orient, 
                                            const Eigen::Quaterniond &gate_orient,
+                                           const QuadParams &quad_params,
                                            const TrajParams &params,
                                            Eigen::Ref<Eigen::Vector4d> gradQuat) const {
   // const double w = quat(0);
@@ -811,18 +829,24 @@ double QuadManifold::addPerceptionPenality(const Eigen::Quaterniond &quad_orient
   double penalty{0.0};
   gradQuat.setZero();
 
-  const Eigen::Quaterniond q_wc = quad_orient * params.q_bc;
+  const Eigen::Quaterniond q_wc = quad_orient * quad_params.q_bc;
   const Eigen::Vector3d z_c = q_wc.toRotationMatrix().col(2);
   const Eigen::Vector3d z_g = gate_orient.toRotationMatrix().col(2);
 
-  if (params.weightPerception <= 1.0e-6) {
-    return penalty;
-  }  
+  penalty = 1.0 - z_c.dot(z_g);
+  // TODO(chao): derive the analytical Jacobian
+  // Eigen::Vector4d grad;
+  // grad << 0.0, -0.5 * z_g.T * skew(z_c); 
+  // gradQuat += grad;
 
-  penalty = params.weightPerception * (1.0 - z_c.dot(z_g));
-  Eigen::Vector4d grad;
-  grad << 0.0, -0.5 * skew(z_c) * z_g; 
-  gradQuat += params.weightPerception * grad;
+  // if (params.weightPerception <= 1.0e-6) {
+  //   return penalty;
+  // }  
+
+  // penalty = params.weightPerception * (1.0 - z_c.dot(z_g));
+  // Eigen::Vector4d grad;
+  // grad << 0.0, -0.5 * skew(z_c) * z_g; 
+  // gradQuat += params.weightPerception * grad;
 
   return penalty;
                                  
@@ -1100,12 +1124,12 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
     omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den - dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
     omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
 
-    tau(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
-    tau(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
-    tau(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
+    tau(0) = quad_params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg(1) * omg(2);
+    tau(1) = quad_params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg(0) * omg(2);
+    tau(2) = quad_params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg(0) * omg(1);
 
-    thrusts = params_.T_mb * (Eigen::Vector4d() << thrust * params_.mass, tau).finished();
-    // thrusts = params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
+    thrusts = quad_params_.T_mb * (Eigen::Vector4d() << thrust * quad_params_.mass, tau).finished();
+    // thrusts = quad_params_.T_mb * (Eigen::Vector4d() << thrust, tau).finished();
   // }
 
 
@@ -1188,9 +1212,9 @@ bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS &input,
   zB2 = alpha2 / alpha_norm_1;
   zB << zB0, zB1, zB2;
 
-  thrust = zB0 * params_.mass * a0 
-                    + zB1 * params_.mass * a1
-                    + zB2 * params_.mass * (a2 + G);
+  thrust = zB0 * quad_params_.mass * a0 
+                    + zB1 * quad_params_.mass * a1
+                    + zB2 * quad_params_.mass * (a2 + G);
   zB2_1 = zB2 + 1;
 
   alpha01 = alpha0 * alpha1;
@@ -1274,13 +1298,13 @@ bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS &input,
   omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
 
   //TODO: the correct expression leads to a worse result...
-  tau_tmp(0) = params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
-  tau_tmp(1) = params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
-  tau_tmp(2) = params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
+  tau_tmp(0) = quad_params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
+  tau_tmp(1) = quad_params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
+  tau_tmp(2) = quad_params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
   tau = tau_tmp;
   // tau_tmp.setZero(); //TODO: in this case, the collective thrust is constrained indeed
 
-  thrusts_tmp = params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
+  thrusts_tmp = quad_params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
   thrusts = thrusts_tmp;
   return true;
 }
@@ -1328,7 +1352,7 @@ bool QuadManifold::toStateWithTiltYawAD(const double t, const PVAJS &input,
   omg = omg_tmp;                              
   omgInput = omg_tmp;
   thrusts = thrusts_tmp;
-  thrust = thrusts.sum() / params_.mass;
+  thrust = thrusts.sum() / quad_params_.mass;
 
   return true;
 
@@ -1373,7 +1397,7 @@ void QuadManifold::backPropagate(
           (mat_tor_dw * (mat_dw_zB * mat_zB_a + mat_dw_dzB * mat_dzB_a +
                           mat_dw_ddzB * mat_ddzB_a) +
               mat_tor_w * (mat_w_zB * mat_zB_a + mat_w_dzB * mat_dzB_a));
-  d_Cf_a += gradCollectiveThr * params_.mass * zB.transpose();
+  d_Cf_a += gradCollectiveThr * quad_params_.mass * zB.transpose();
 
   d_Cf_j = gradTorque.transpose() *
           (mat_tor_dw * (mat_dw_dzB * mat_dzB_j + mat_dw_ddzB * mat_ddzB_j) +
@@ -1405,7 +1429,7 @@ void QuadManifold::backPropagateSimple(
   d_Cw_a = gradOmg.transpose() * (mat_w_zB * mat_zB_a + mat_w_dzB * mat_dzB_a);
   d_Cw_j = gradOmg.transpose() * (mat_w_dzB * mat_dzB_j);
 
-  d_Cf_a = gradThr * params_.mass * zB.transpose();
+  d_Cf_a = gradThr * quad_params_.mass * zB.transpose();
   
   //TODO: no rotation in penality
   gradTotalAcc = d_Cw_a + d_Cf_a;

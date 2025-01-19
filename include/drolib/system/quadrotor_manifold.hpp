@@ -114,10 +114,11 @@ public:
                                const TrajParams &params,
                                Eigen::Ref<Eigen::Vector3d> gradOmg) const;
 
-  double addPerceptionPenality(const Eigen::Quaterniond &quad_orient,
-                               const Eigen::Quaterniond &gate_orient,
-                               const TrajParams &params,
-                               Eigen::Ref<Eigen::Vector4d> gradQuat) const;
+  double addPerceptionCost(const Eigen::Quaterniond &quad_orient,
+                            const Eigen::Quaterniond &gate_orient,
+                            const QuadParams &quad_params,
+                            const TrajParams &params,
+                            Eigen::Ref<Eigen::Vector4d> gradQuat) const;
 
   double addRotationPenalities(const Eigen::Vector4d &quat,
                                const TrajParams &params,
@@ -133,10 +134,10 @@ public:
 
   void calcJacobian(void) const;
 
-  inline bool valid(void) const { return params_.valid(); }
+  inline bool valid(void) const { return quad_params_.valid(); }
 
 private:
-  QuadParams params_;
+  QuadParams quad_params_;
 
   Eigen::Matrix3d I33 = Eigen::Matrix3d::Identity(); // 3x3 identity
 
@@ -225,6 +226,9 @@ private:
   casadi::Function fun_forward_singleThr_jacSna_;
   casadi::Function fun_forward_singleThr_jacHeading_;
 
+  casadi::Function fun_perception_cost_;
+  casadi::Function fun_perception_cost_jacQuat_;
+
   inline casadi::SX dot_SX(const casadi::SX &a, const casadi::SX &b) {
     return a(0) * b(0) + a(1) * b(1) + a(2) * b(2);
   }
@@ -233,6 +237,66 @@ private:
     return vertcat(-a(2) * b(1) + a(1) * b(2), a(2) * b(0) - a(0) * b(2),
                    -a(1) * b(0) + a(0) * b(1));
   }
+
+  inline casadi::SX rotate_quat(const casadi::SX& q, const casadi::SX& v) {
+    // Extract scalar (w) and vector (vec) parts from the quaternion
+    casadi::SX w = q(0);                    // Scalar part
+    casadi::SX vec = q(casadi::Slice(1, 4)); // Vector part
+
+    // Compute uv = 2 * cross(vec, v)
+    casadi::SX uv = cross_SX(vec, v);  
+    uv = 2 * uv;
+
+    // Return the rotated vector
+    return v + w * uv + cross_SX(vec, uv);
+  }
+
+  inline casadi::SX quat_mult(const casadi::SX& q1, const casadi::SX& q2) {
+    // Quaternion multiplication
+    casadi::SX ans = casadi::SX::vertcat({
+        q2(0) * q1(0) - q2(1) * q1(1) - q2(2) * q1(2) - q2(3) * q1(3),
+        q2(0) * q1(1) + q2(1) * q1(0) - q2(2) * q1(3) + q2(3) * q1(2),
+        q2(0) * q1(2) + q2(2) * q1(0) + q2(1) * q1(3) - q2(3) * q1(1),
+        q2(0) * q1(3) - q2(1) * q1(2) + q2(2) * q1(1) + q2(3) * q1(0)
+    });
+    return ans;
+  }
+
+  inline void initPerceptionCostCasadiFunc(const QuadParams params) {
+    // casadi::DM gate_orient = vertcat(params.);
+    double q_wg_w = params.gate_orient.w();
+    double q_wg_x = params.gate_orient.x();
+    double q_wg_y = params.gate_orient.y();
+    double q_wg_z = params.gate_orient.z();
+
+    double q_bc_w = params.q_bc.w();
+    double q_bc_x = params.q_bc.x();
+    double q_bc_y = params.q_bc.y();
+    double q_bc_z = params.q_bc.z();  
+
+    casadi::SX q_wb = casadi::SX::sym("q_wb", 4);
+
+
+    // Create a CasADi SX representation of the quaternion
+    casadi::SX q_wg = casadi::SX::vertcat({q_wg_w, q_wg_x, q_wg_y, q_wg_z});
+    casadi::SX q_bc = casadi::SX::vertcat({q_bc_w, q_bc_x, q_bc_y, q_bc_z});
+    casadi::SX q_wc = quat_mult(q_wb, q_bc);
+
+    casadi::SX e_z = casadi::SX::vertcat({0.0, 0.0, 1.0});
+    casadi::SX z_g = rotate_quat(q_wg, e_z);
+    casadi::SX z_c = rotate_quat(q_wc, e_z);
+
+    casadi::SX cost = 1 * (1.0 - dot_SX(z_c, z_g));
+
+    fun_perception_cost_ =
+        casadi::Function("perception_cost", {q_wb}, {cost});
+
+    casadi::SX jac_q = jacobian(cost, q_wb);
+    fun_perception_cost_jacQuat_ =
+        casadi::Function("perceptoin_cost_jacQuat", {q_wb}, {densify(jac_q)});
+
+  }
+
 
   inline void initSingleThrCasadiFunc(const QuadParams params) {
     const double I_x = params.inertia.x();
@@ -558,6 +622,53 @@ private:
     delete iw_jacHeading;
     delete w_jacHeading;
   }
+
+inline double
+  computePerceptionCost(const Eigen::Vector4d &quad_orient,
+                     Eigen::Matrix<double, 4, 1> &jacQuat) const {
+    // evaluate fun_forward_singleThr_:
+    double cost{0.0};
+    size_t sz_arg = fun_perception_cost_.sz_arg();
+    size_t sz_res = fun_perception_cost_.sz_res();
+    const double *arg[sz_arg];
+    const double *input = quad_orient.data();
+    arg[0] = (const double *)input;
+
+    double *res_cost[sz_res];
+    res_cost[0] = &cost;
+    casadi_int *iw_cost = new casadi_int[fun_perception_cost_.sz_iw()];
+    double *w_cost = new double[fun_perception_cost_.sz_w()];
+    fun_perception_cost_(arg, res_cost, iw_cost, w_cost);
+
+    delete iw_cost;
+    delete w_cost;
+
+    // evaluate jacHeading
+    jacQuat.setZero();
+    size_t sz_res_jacQuat = fun_perception_cost_jacQuat_.sz_res();
+    double *res_jacQuat[sz_res_jacQuat];
+    res_jacQuat[0] = (double *)jacQuat.data();
+    casadi_int *iw_jacQuat =
+        new casadi_int[fun_perception_cost_jacQuat_.sz_iw()];
+    double *w_jacQuat = new double[fun_perception_cost_jacQuat_.sz_w()];
+    fun_perception_cost_jacQuat_(arg, res_jacQuat, iw_jacQuat,
+                                      w_jacQuat);
+
+    delete iw_jacQuat;
+    delete w_jacQuat;
+
+    return cost;
+  }
+    // double *res_cost[sz_res];
+    // res_cost[0] = &cost;
+    // casadi_int *iw_cost = new casadi_int[fun_perception_cost_.sz_iw()];
+    // double *w_cost = new double[fun_perception_cost_.sz_w()];
+    // fun_perception_cost_(arg, res_cost, iw_cost, w_cost);
+
+    // delete iw_cost;
+    // delete w_cost;
+
+
 };
 
 } // namespace drolib

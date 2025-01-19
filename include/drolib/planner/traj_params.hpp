@@ -2,6 +2,7 @@
 
 #include <Eigen/Eigen>
 #include "drolib/base/parameter_base.hpp"
+#include "drolib/rotation/rotation_utils.h"
 
 namespace drolib {
 
@@ -17,7 +18,7 @@ class TrajParams : public ParameterBase {
   
     collectivtThrMean = 4.0 * thrMean;
     collectivtThrRadi = 4.0 * thrRadi;
-    collectivtThrRadiSqr = collectivtThrRadi * collectivtThrRadi;    
+    collectivtThrRadiSqr = collectivtThrRadi * collectivtThrRadi; 
   }
 
   using ParameterBase::load;
@@ -68,8 +69,7 @@ class TrajParams : public ParameterBase {
   Eigen::Vector2d boundY{-10000,10000};
   Eigen::Vector2d boundZ{-10000,10000};
 
-  Eigen::Quaterniond q_bc{Eigen::Quaterniond::Identity()};
-  Eigen::Vector3d t_b_cb{Eigen::Vector3d::Zero()};
+
 };
 
 }  // namespace drolib

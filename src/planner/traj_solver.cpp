@@ -269,7 +269,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
       sna = c.transpose() * beta.col(4);
       cra = c.transpose() * beta.col(5);
 
-      //TODO: set up yaw correctly
+      //TODO: compute yaw angle from another polynomial
       yaw = yawTilt->at(j * step);
 
       pvajs << pos, vel, acc, jer, sna;
