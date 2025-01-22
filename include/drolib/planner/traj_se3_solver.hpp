@@ -1,24 +1,24 @@
 #ifndef DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_
 #define DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_
 
-
-#include <Eigen/Eigen>
+#include "drolib/planner/traj_params.hpp"
 #include "drolib/planner/traj_se3_data.hpp"
-#include "drolib/planner/traj_se3_params.hpp"
 #include "drolib/polynomial/piecewise_polynomial.hpp"
 #include "drolib/solver/lbfgs_params.hpp"
 #include "drolib/solver/minco_snap.hpp"
+#include "drolib/solver/minco_snap_1d.hpp"
+#include <Eigen/Eigen>
 
+#include "drolib/planner/angle.hpp"
 #include "drolib/solver/lbfgs.hpp"
 #include "drolib/system/quadrotor_manifold.hpp"
 #include "drolib/type/types.hpp"
 #include <deque>
-#include "drolib/planner/angle.hpp"
 
 namespace drolib {
 
 class TrajSE3Solver {
- public:
+public:
   enum class Status : int {
     LBFGS_CONVERGENCE = 0,
     LBFGS_STOP,
@@ -30,11 +30,13 @@ class TrajSE3Solver {
   TrajSE3Solver() = default;
   ~TrajSE3Solver() {}
 
-  static void computeBeta(const double t, Eigen::Ref<Eigen::Matrix<double, NUM_COEFF, 6>> beta);
+  static void computeBeta(const double t,
+                          Eigen::Ref<Eigen::Matrix<double, NUM_COEFF, 6>> beta);
 
-  bool solve(const PVAJ &initState, const PVAJ &endState, const Eigen::Vector3d &initYaw,
-            const Eigen::Vector3d &endYaw, const QuadManifold &quad,
-             const TrajParams &tparams, const LbfgsParams &lbfgs);
+  bool solve(const PVAJ &initState, const PVAJ &endState,
+             const Eigen::Vector3d &initYaw, const Eigen::Vector3d &endYaw,
+             const QuadManifold &quad, const TrajParams &tparams,
+             const LbfgsParams &lbfgs);
 
   // bool getTraejctory(PiecewisePolynomial<POLY_DEG> &trajectory) const {
   //   if (status == Status::LBFGS_FAILED) {
@@ -45,7 +47,7 @@ class TrajSE3Solver {
   // }
   // // bool getWaypoints() const;
 
- public:
+public:
   MincoSnap minco;
   MincoSnap1D minco_yaw;
   Status status{Status::LBFGS_FAILED};
@@ -54,24 +56,29 @@ class TrajSE3Solver {
   QuadManifold quad;
   TrajParams tparams;
   std::shared_ptr<AngleBase> yawTilt;
-  
+
   static double costFunction(void *ptr, const Eigen::VectorXd &x,
                              Eigen::VectorXd &g);
 
-  static double addEnergyCost(const MincoSnap &minco, const TrajParams &params,
-                              Eigen::MatrixX3d &gradC, Eigen::VectorXd &gradT);
+  static double addEnergyCost(const MincoSnap &minco_path,
+                              const MincoSnap1D &minco_heading,
+                              const TrajParams &params, Eigen::VectorXd &gradT,
+                              Eigen::MatrixX3d &gradC,
+                              Eigen::VectorXd &gradHeadingC);
 
   static double addTimeCost(const Eigen::VectorXd &T, const TrajParams &params,
                             Eigen::VectorXd &gradByTimes);
 
   static double addPenaltyCost(const Eigen::VectorXd &T,
                                const Eigen::MatrixX3d &coeffs,
-                               const QuadManifold &quad,
-                               AngleBase* yawTilt,
-                               const TrajParams &params,  
-                               Eigen::MatrixX3d &gradC, Eigen::VectorXd &gradT);
+                               const Eigen::VectorXd &heading_coeffs,
+                               const QuadManifold &quad, AngleBase *yawTilt,
+                               const TrajParams &params,
+                               Eigen::VectorXd &gradT,
+                               Eigen::MatrixX3d &gradC,
+                               Eigen::VectorXd &gradHeadingC);
 };
 
-}
+} // namespace drolib
 
-#endif  /* DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_ */
+#endif /* DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_ */

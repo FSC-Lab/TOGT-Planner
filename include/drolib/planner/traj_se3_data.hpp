@@ -66,6 +66,7 @@ struct TrajSE3Data {
   int headingVarDim{0};
 
   Eigen::VectorXd x;
+  
   Eigen::VectorXd T;
   Eigen::Matrix3Xd P;
   Eigen::VectorXd Y;
@@ -73,8 +74,9 @@ struct TrajSE3Data {
   Eigen::VectorXd gradByTimes;
   Eigen::Matrix3Xd gradByPoints;
   Eigen::VectorXd gradByYaw;
-  Eigen::MatrixX4d partialGradByCoeffs;
   Eigen::VectorXd partialGradByTimes;
+  Eigen::MatrixX3d partialGradByCoeffs;
+  Eigen::VectorXd partialGradByHeadingCoeffs;
 };
 
 } // namespace drolib

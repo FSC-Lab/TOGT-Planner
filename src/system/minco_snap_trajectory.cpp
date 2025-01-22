@@ -22,10 +22,12 @@ MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name,
       end_yaw(start_yaw), rotation_type(RotationType::TILT_HEADING),
       heading_type(HeadingType::CONSTANT_HEADING) {}
 
+
 // TODO(chao): change here to modify the heading
 TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
                                                  const bool forward_heading) {
   TrajExtremum extremum;
+  
   if (!quad.valid()) {
     return extremum;
   }
@@ -51,6 +53,8 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   double t{0.0};
   double dt{0.0};
+  std::vector<double> times;
+  std::vector<double> lengths;
 
   Eigen::Vector3d last_pos = polys.getPos(t);
   double length{0.0};
@@ -62,6 +66,11 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
   }
 
   for (int i = 0; i <= nSamples; ++i) {
+    // std::cout << "t :" << t << std::endl;
+    // std::cout << "length :" << length << std::endl;
+    times.push_back(t);
+    lengths.push_back(length);
+
     pvajs = polys.getPVAJS(t);
 
     Eigen::Vector3d pos = pvajs.col(0);
@@ -117,7 +126,66 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
     quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
   }
   setpoints.push_back(setpoint);
+  times.push_back(T);
+  lengths.push_back(length);
+
+
+
+  
+  length_to_time_.set_points(lengths, times, false);
+
+  // double tt = length_to_time_(0.5);
+  // std::cout << "-----------tt: " << tt << std::endl;  
+
+  extremum_ = extremum;
+  total_length_ = length;;
   return extremum;
+}
+
+bool MincoSnapTrajectory::getSetpointVecByDist(const double sampleDistMeter, const bool forward_heading) {
+
+  if (total_length_ < sampleDistMeter) {
+    std::cout << "Undefined length or no waypoint" << std::endl;
+    return false;
+  }
+  setpoints_dist.clear();
+
+  Setpoint setpoint;
+  PVAJS pvajs;
+  Eigen::Vector3d yaw;
+
+  const double T = polys.getTotalDuration();
+  const double total_length = total_length_;
+  double length{0.0};
+
+  const int num_points = static_cast<int>(total_length / sampleDistMeter);
+  for (int i = 0; i < num_points; ++i) {
+    // get the mapping from distance to time
+    
+    double t = length_to_time_(length);
+    length += sampleDistMeter;
+
+    // double t{0};
+
+    // std::cout  << "t: " << t << std::endl;
+    // std::cout  << "length: " << length << std::endl;
+    pvajs = polys.getPVAJS(t);
+    yaw << 0.0, 0.0, 0.0;
+    quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
+    setpoints_dist.push_back(setpoint);
+
+  }
+
+    // Add the last setpoint
+  pvajs = polys.getPVAJS(T);
+  if (rotation_type == RotationType::TILT_HEADING) {
+    quad.toStateWithTiltYaw(T, pvajs, yaw, setpoint);
+  } else {
+    quad.toStateWithTrueYaw(T, pvajs, yaw, setpoint);
+  }
+  setpoints_dist.push_back(setpoint);
+
+  return true;
 }
 
 bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
@@ -346,6 +414,54 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename,
   return true;
 }
 
+bool MincoSnapTrajectory::saveSetpointDist(const std::string &filename) {
+  std::cout << "saveSetpointDist" << std::endl;
+  if (!valid() || setpoints_dist.empty()) {
+    std::cout << "no valid point!" << std::endl;
+    return false;
+  }
+
+  // if (!setpoints_dist.front().input.isSingleRotorThrusts()) {
+  //   std::cout << "no single-rotor-thrust point!" << std::endl;
+  //   return false;
+  // }
+
+  std::ofstream file;
+  file.open(filename.c_str());
+  file << "t,p_x,p_y,p_z,q_x,q_y,q_z,q_w,v_x,v_y,v_z,w_x,w_y,w_z,"
+       << "a_lin_x,a_lin_y,a_lin_z,a_rot_x,a_rot_y,a_rot_z,"
+       << "u_1,u_2,u_3,u_4,"
+       << "jerk_x,jerk_y,jerk_z,snap_x,snap_y,snap_z,"
+       << "thrust\n";
+  Eigen::Vector3d accRot = Eigen::Vector3d::Zero();
+  for (const auto &setpoint : setpoints_dist) {
+    const double &t = setpoint.state.t;
+    const Eigen::Vector3d &pos = setpoint.state.p;
+    const Eigen::Vector3d &vel = setpoint.state.v;
+    const Eigen::Vector3d &acc = setpoint.state.a;
+    const Eigen::Vector3d &jer = setpoint.state.j;
+    const Eigen::Vector3d &sna = setpoint.state.s;
+    const Eigen::Vector4d &quat = setpoint.state.qx;
+    const Eigen::Vector3d &omg = setpoint.input.omega;
+    const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
+    // std::cout << "quat(0): " << quat(0) << std::endl;
+    file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
+         << "," << pos(1) << "," << pos(2) << "," << quat(1) << "," << quat(2)
+         << "," << quat(3) << "," << quat(0) << "," << vel(0) << "," << vel(1)
+         << "," << vel(2) << "," << omg(0) << "," << omg(1) << "," << omg(2)
+         << "," << acc(0) << "," << acc(1) << "," << acc(2) << "," << accRot(0)
+         << "," << accRot(1) << "," << accRot(2) << "," << thrusts(0) << ","
+         << thrusts(1) << "," << thrusts(2) << "," << thrusts(3) << ","
+         << jer(0) << "," << jer(1) << "," << jer(2) << "," << sna(0) << ","
+         << sna(1) << "," << sna(2) << "," << setpoint.input.collective_thrust
+         << "\n";
+  }
+
+  file.close();
+  return true;
+}
+
+
 bool MincoSnapTrajectory::save(const std::string &filename) {
   if (!valid() || setpoints.empty()) {
     return false;
@@ -362,6 +478,40 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
   //     directory = filename.substr(0, last_slash_idx);
   // }
   // fs::create_directory(directory.c_str());
+
+  //TODO(chao): delete it
+  // std::ofstream file;
+  // file.open(filename.c_str());
+  // file << "t,p_x,p_y,p_z,q_w,q_x,q_y,q_z,v_x,v_y,v_z,w_x,w_y,w_z,"
+  //      << "a_lin_x,a_lin_y,a_lin_z,a_rot_x,a_rot_y,a_rot_z,"
+  //      << "u_1,u_2,u_3,u_4,"
+  //      << "jerk_x,jerk_y,jerk_z,snap_x,snap_y,snap_z,"
+  //      << "thrust\n";
+  // Eigen::Vector3d accRot = Eigen::Vector3d::Zero();
+  // for (const auto &setpoint : setpoints) {
+  //   const double &t = setpoint.state.t;
+  //   const Eigen::Vector3d &pos = setpoint.state.p;
+  //   const Eigen::Vector3d &vel = setpoint.state.v;
+  //   const Eigen::Vector3d &acc = setpoint.state.a;
+  //   const Eigen::Vector3d &jer = setpoint.state.j;
+  //   const Eigen::Vector3d &sna = setpoint.state.s;
+  //   const Eigen::Vector4d &quat = setpoint.state.qx;
+  //   const Eigen::Vector3d &omg = setpoint.input.omega;
+  //   const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
+  //   // std::cout << "quat(0): " << quat(0) << std::endl;
+  //   file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
+  //        << "," << pos(1) << "," << pos(2) << "," << quat(0) << "," << quat(1)
+  //        << "," << quat(2) << "," << quat(3) << "," << vel(0) << "," << vel(1)
+  //        << "," << vel(2) << "," << omg(0) << "," << omg(1) << "," << omg(2)
+  //        << "," << acc(0) << "," << acc(1) << "," << acc(2) << "," << accRot(0)
+  //        << "," << accRot(1) << "," << accRot(2) << "," << thrusts(0) << ","
+  //        << thrusts(1) << "," << thrusts(2) << "," << thrusts(3) << ","
+  //        << jer(0) << "," << jer(1) << "," << jer(2) << "," << sna(0) << ","
+  //        << sna(1) << "," << sna(2) << "," << setpoint.input.collective_thrust
+  //        << "\n";
+  // }
+
+
 
   std::ofstream file;
   file.open(filename.c_str());

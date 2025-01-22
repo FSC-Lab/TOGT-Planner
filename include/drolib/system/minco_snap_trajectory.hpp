@@ -4,6 +4,7 @@
 #include "drolib/planner/traj_data.hpp"
 #include "drolib/rotation/rotation_utils.h"
 #include "drolib/type/types.hpp"
+#include "drolib/polynomial/cubic_spline.h"
 
 #include "drolib/type/set_point.hpp"
 #include "drolib/system/quadrotor_manifold.hpp"
@@ -107,6 +108,8 @@ struct MincoSnapTrajectory {
 
   bool save(const std::string &filename);
 
+  bool saveSetpointDist(const std::string &filename);
+
   bool saveSegments(const std::string &filename, const int piecesPerSegment);
 
   bool saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments);
@@ -116,6 +119,8 @@ struct MincoSnapTrajectory {
   inline double getTotalDuration() const { return polys.getTotalDuration(); }
 
   TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01, const bool forward_heading = false); 
+
+  bool getSetpointVecByDist(const double sampleDistMeter = 0.1, const bool forward_heading = false);
 
   std::string name;
   std::string quad_name;
@@ -130,7 +135,12 @@ struct MincoSnapTrajectory {
   RotationType rotation_type{TILT_HEADING};
   HeadingType heading_type{CONSTANT_HEADING};
 
+  double total_length_{0.0};
   SetpointVector setpoints;
+  SetpointVector setpoints_dist;
+  TrajExtremum extremum_;
+  spline::CubicSpline length_to_time_;
+
   Eigen::Quaterniond prev_quat{Eigen::Quaterniond::Identity()};
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);

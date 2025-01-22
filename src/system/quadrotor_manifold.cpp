@@ -101,17 +101,17 @@ double QuadManifold::computePenalityCost(
   gradTotalSna.setZero();
   gradTotalHeading.setZero();
 
-  // Setpoint setpoint;
-  // toStateWithTiltYawMass(0.0, pvajs, heading, setpoint);
-  // cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
-  // cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
-  // cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
-  // cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-  // cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+  Setpoint setpoint;
+  toStateWithTiltYawMass(0.0, pvajs, heading, setpoint);
+  cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
+  cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
+  cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
+  cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
+  cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
 
-  // backPropagate(gradPos, gradVel, gradQuat, gradOmg,
-  //                         gradThrusts, gradTotalPos, gradTotalVel,
-  //                         gradTotalAcc, gradTotalJer, gradTotalSna);
+  backPropagate(gradPos, gradVel, gradQuat, gradOmg,
+                          gradThrusts, gradTotalPos, gradTotalVel,
+                          gradTotalAcc, gradTotalJer, gradTotalSna);
   // std::cout << "---------------Analytical gradient---------------" << std::endl;
                       
   // std::cout << "quat: " << setpoint.state.qx.transpose() << std::endl;
@@ -122,66 +122,67 @@ double QuadManifold::computePenalityCost(
   // std::cout << "gradTotalJer: " << gradTotalJer.transpose() << std::endl;
   // std::cout << "gradTotalSna: " << gradTotalSna.transpose() << std::endl;
   // std::cout << "totalHeading: " << totalHeading.transpose() << std::endl;
-  /**************************** */
-  Setpoint setpoint_ad;
+  /****************************AD */
+  // Setpoint setpoint_ad;
 
-  Eigen::Matrix<double, 11, 3> jacVel;
-  Eigen::Matrix<double, 11, 3> jacAcc;
-  Eigen::Matrix<double, 11, 3> jacJer;
-  Eigen::Matrix<double, 11, 3> jacSna;
-  Eigen::Matrix<double, 11, 3> jacHeading;
-  toStateWithTiltYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
+  // Eigen::Matrix<double, 11, 3> jacVel;
+  // Eigen::Matrix<double, 11, 3> jacAcc;
+  // Eigen::Matrix<double, 11, 3> jacJer;
+  // Eigen::Matrix<double, 11, 3> jacSna;
+  // Eigen::Matrix<double, 11, 3> jacHeading;
+  // toStateWithTiltYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
 
-  cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
-  cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
-  cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
+  // cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
+  // cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
+  // cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
 
-  // double objective = computePerceptionCost(setpoint_ad.state.qx, gradPerceptionQuat);
-  // std::cout << "------------------" << std::endl;
-  // std::cout << "objective: " << objective << std::endl;
-  // std::cout << "gradPerceptionQuat: " << gradPerceptionQuat.transpose() << std::endl;
-  
-  // // Eigen::Quaterniond quad_orient = setpoint_ad.state.q();
-  // // Eigen::Quaterniond gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-90,0,-90)));
-  
-  // // objective = addPerceptionCost(setpoint_ad.state.q(), quad_params_.gate_orient, quad_params_, params, gradPerceptionQuat); 
+  // // double objective = computePerceptionCost(setpoint_ad.state.qx, gradPerceptionQuat);
+  // // std::cout << "------------------" << std::endl;
   // // std::cout << "objective: " << objective << std::endl;
   // // std::cout << "gradPerceptionQuat: " << gradPerceptionQuat.transpose() << std::endl;
-  // gradPerceptionQuat.setZero();
+  
+  // // // Eigen::Quaterniond quad_orient = setpoint_ad.state.q();
+  // // // Eigen::Quaterniond gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-90,0,-90)));
+  
+  // // // objective = addPerceptionCost(setpoint_ad.state.q(), quad_params_.gate_orient, quad_params_, params, gradPerceptionQuat); 
+  // // // std::cout << "objective: " << objective << std::endl;
+  // // // std::cout << "gradPerceptionQuat: " << gradPerceptionQuat.transpose() << std::endl;
+  // // gradPerceptionQuat.setZero();
 
-  gradTotalAcc =
-        (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
-        +
-        (gradOmg.transpose() * jacAcc.middleRows(4, 3)).transpose() // omg penalty
-        + gradThrusts(0) * jacAcc.row(7).transpose()   // thrust 1 penalty
-        + gradThrusts(1) * jacAcc.row(8).transpose()   // thrust 2 penalty
-        + gradThrusts(2) * jacAcc.row(9).transpose()   // thrust 3 penalty
-        + gradThrusts(3) * jacAcc.row(10).transpose()  // thrust 4 penalty
-        + (gradPerceptionQuat.transpose() * jacAcc.topRows(4)).transpose(); // perception cost
+  // gradTotalAcc =
+  //       (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
+  //       +
+  //       (gradOmg.transpose() * jacAcc.middleRows(4, 3)).transpose() // omg penalty
+  //       + gradThrusts(0) * jacAcc.row(7).transpose()   // thrust 1 penalty
+  //       + gradThrusts(1) * jacAcc.row(8).transpose()   // thrust 2 penalty
+  //       + gradThrusts(2) * jacAcc.row(9).transpose()   // thrust 3 penalty
+  //       + gradThrusts(3) * jacAcc.row(10).transpose()  // thrust 4 penalty
+  //       + (gradPerceptionQuat.transpose() * jacAcc.topRows(4)).transpose(); // perception cost
 
 
-  gradTotalJer =
-      (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose() // omg penalty
-      + gradThrusts(0) * jacJer.row(7).transpose()   // thrust 1 penalty
-      + gradThrusts(1) * jacJer.row(8).transpose()   // thrust 2 penalty
-      + gradThrusts(2) * jacJer.row(9).transpose()   // thrust 3 penalty
-      + gradThrusts(3) * jacJer.row(10).transpose(); // thrust 4 penalty
+  // gradTotalJer =
+  //     (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose() // omg penalty
+  //     + gradThrusts(0) * jacJer.row(7).transpose()   // thrust 1 penalty
+  //     + gradThrusts(1) * jacJer.row(8).transpose()   // thrust 2 penalty
+  //     + gradThrusts(2) * jacJer.row(9).transpose()   // thrust 3 penalty
+  //     + gradThrusts(3) * jacJer.row(10).transpose(); // thrust 4 penalty
 
-  gradTotalSna =
-      gradThrusts(0) * jacSna.row(7).transpose()     // thrust 1 penalty
-      + gradThrusts(1) * jacSna.row(8).transpose()   // thrust 2 penalty
-      + gradThrusts(2) * jacSna.row(9).transpose()   // thrust 3 penalty
-      + gradThrusts(3) * jacSna.row(10).transpose(); // thrust 4 penalty
+  // gradTotalSna =
+  //     gradThrusts(0) * jacSna.row(7).transpose()     // thrust 1 penalty
+  //     + gradThrusts(1) * jacSna.row(8).transpose()   // thrust 2 penalty
+  //     + gradThrusts(2) * jacSna.row(9).transpose()   // thrust 3 penalty
+  //     + gradThrusts(3) * jacSna.row(10).transpose(); // thrust 4 penalty
 
-  gradTotalHeading = 
-      (gradQuat.transpose() * jacHeading.topRows(4)).transpose() // quat penalty
-      +
-      (gradOmg.transpose() * jacHeading.middleRows(4, 3)).transpose() // omg penalty
-      + gradThrusts(0) * jacHeading.row(7).transpose() // thrust 1 penalty
-      + gradThrusts(1) * jacHeading.row(8).transpose()   // thrust 2 penalty
-      + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
-      + gradThrusts(3) * jacHeading.row(10).transpose() // thrust 4 penalty
-      + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose(); // perception cost
+  // gradTotalHeading = 
+  //     (gradQuat.transpose() * jacHeading.topRows(4)).transpose() // quat penalty
+  //     +
+  //     (gradOmg.transpose() * jacHeading.middleRows(4, 3)).transpose() // omg penalty
+  //     + gradThrusts(0) * jacHeading.row(7).transpose() // thrust 1 penalty
+  //     + gradThrusts(1) * jacHeading.row(8).transpose()   // thrust 2 penalty
+  //     + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
+  //     + gradThrusts(3) * jacHeading.row(10).transpose() // thrust 4 penalty
+  //     + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose(); // perception cost
+  /**************************** */
 
 
   // std::cout << "---------------Autodiff gradient---------------" << std::endl;

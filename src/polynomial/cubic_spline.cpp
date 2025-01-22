@@ -258,11 +258,11 @@ double CubicSpline::operator()(double x) const {
 
   double h = x - m_x[idx];
   double interpol;
-  if (x < m_x[0]) {
+  if (x <= m_x[0]) {
     // extrapolation to the left
     // interpol = (m_b0 * h + m_c0) * h + m_y[0];
     interpol = m_y[0];
-  } else if (x > m_x[n - 1]) {
+  } else if (x >= m_x[n - 1]) {
     // extrapolation to the right
     // interpol = (m_b[n - 1] * h + m_c[n - 1]) * h + m_y[n - 1];
     interpol = m_y[n-1];

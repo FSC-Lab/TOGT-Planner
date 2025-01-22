@@ -71,8 +71,9 @@ bool TrajSE3Data::allocateSpace() {
   gradByTimes.resize(totalPieces);
   gradByPoints.resize(PATH_DIM, numPoints);
   gradByYaw.resize(headingVarDim);
-  partialGradByCoeffs.resize(NUM_COEFF * totalPieces, PATH_DIM + YAW_DIM);
   partialGradByTimes.resize(totalPieces);
+  partialGradByCoeffs.resize(NUM_COEFF * totalPieces, PATH_DIM);
+  partialGradByHeadingCoeffs.resize(NUM_COEFF * totalPieces, YAW_DIM);
 
   x.setZero();
   T.setZero();
@@ -81,8 +82,9 @@ bool TrajSE3Data::allocateSpace() {
   gradByPoints.setZero();
   gradByTimes.setZero();
   gradByYaw.setZero();
-  partialGradByCoeffs.setZero();
   partialGradByTimes.setZero();
+  partialGradByCoeffs.setZero();
+  partialGradByHeadingCoeffs.setZero();
 
   return true;
 }

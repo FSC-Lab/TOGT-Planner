@@ -198,6 +198,8 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
             MincoSnapTrajectory(params_.qp.name, quad_, solver_.data, initHeading,
                                 track->getName() + " Trajectory");
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, forwardHeading_);
+        trajectory_.getSetpointVecByDist(sampleDistMeter_);
+
       } else {
         std::cout << "Not using forward heading" << std::endl;
 
@@ -205,6 +207,7 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
             params_.qp.name, quad_, solver_.data, desiredYaw_, desiredYaw_,
             track->getName() + " Trajectory", rtype_, htype_);
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
+        trajectory_.getSetpointVecByDist(sampleDistMeter_);
       }
     }   
 

@@ -41,6 +41,7 @@ private:
   TrajSolver solver_;
 
   double trajSampleTimeSec_{0.01};
+  double sampleDistMeter_{0.1};
   MincoSnapTrajectory trajectory_;
   TrajExtremum extremum_;
 
