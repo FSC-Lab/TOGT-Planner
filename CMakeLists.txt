@@ -3,7 +3,7 @@ project(TOGT-Planner)
 
 find_package(cyblib REQUIRED)
 
-add_library(TOGT-Planner_Shapes)
+add_library(TOGT-Planner_Shapes STATIC)
 target_sources(
   TOGT-Planner_Shapes
   PUBLIC src/shape/ball.cpp
@@ -28,11 +28,11 @@ target_sources(
          ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/shape/rectangle.h
          ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/shape/triangle.h)
 target_compile_features(TOGT-Planner_Shapes PUBLIC cxx_std_17)
-target_link_libraries(TOGT-Planner_Shapes PUBLIC Eigen3::Eigen)
+target_link_libraries(TOGT-Planner_Shapes PUBLIC Eigen3::Eigen cyblib::uav cyblib::utils)
 set_target_properties(TOGT-Planner_Shapes PROPERTIES EXPORT_NAME Shapes)
 add_library(TOGT-Planner::Shapes ALIAS TOGT-Planner_Shapes)
 
-add_library(TOGT-Planner_Planner)
+add_library(TOGT-Planner_Planner STATIC)
 target_sources(
   TOGT-Planner_Planner
   PUBLIC src/base/parameter_base.cpp
@@ -74,7 +74,6 @@ target_sources(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/geometry/geoutils.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/geometry/quickhull.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/math/fast_atan2.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/math/gravity.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/math/median.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/math/min_max_recorder.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/planner/angle.hpp
@@ -98,13 +97,11 @@ target_sources(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/minco_snap_trajectory.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/quadrotor_manifold.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/quadrotor_params.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/imu_sample.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/odom.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/types.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/timer.hpp)
 target_compile_features(TOGT-Planner_Planner PUBLIC cxx_std_17)
-target_link_libraries(TOGT-Planner_Planner PUBLIC cyblib::core
+target_link_libraries(TOGT-Planner_Planner PUBLIC 
                                                   TOGT-Planner::Shapes)
 
 set_target_properties(TOGT-Planner_Planner PROPERTIES EXPORT_NAME Planner)

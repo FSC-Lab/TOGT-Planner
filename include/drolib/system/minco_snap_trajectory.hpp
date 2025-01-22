@@ -126,7 +126,8 @@ struct MincoSnapTrajectory {
   RotationType rotation_type{TILT_HEADING};
   HeadingType heading_type{CONSTANT_HEADING};
 
-  SetpointVector setpoints;
+  cyb::SetpointVector setpoints;
+  std::vector<JerkSnap> js_vec;
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);
 };

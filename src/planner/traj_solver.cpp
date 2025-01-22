@@ -121,7 +121,7 @@ double TrajSolver::addRobustPenaltyCost(const Eigen::VectorXd &T,
   Eigen::Vector3d pos, vel, acc, jer, sna, cra;
   Eigen::Vector3d yaw;
   PVAJS pvajs;
-  Setpoint setpoint;
+  cyb::Setpoint  setpoint;
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
   Eigen::Vector3d totalGradJer, totalGradSna, totalGradCra;
@@ -175,7 +175,7 @@ double TrajSolver::addRobustPenaltyCost(const Eigen::VectorXd &T,
       // penalty += addBodyratePenalities(setpoint.state.w, params, gradOmg);
       // penalty += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
       // //TODO: not tested yet
-      penalty += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+      penalty += addBoundaryPenalities(setpoint.state.position(), params, gradPos);
 
       node = (j == 0 || j == numCheckPerPiece) ? 0.5 : 1.0;
       alpha = j * integralFrac;
@@ -216,7 +216,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
   Eigen::Vector3d pos, vel, acc, jer, sna, cra;
   Eigen::Vector3d yaw;
   PVAJS pvajs;
-  Setpoint setpoint;
+  cyb::Setpoint  setpoint;
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
   Eigen::Vector3d totalGradJer, totalGradSna, totalGradCra;

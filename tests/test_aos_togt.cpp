@@ -35,7 +35,8 @@ TEST_F(AosTogtTest, planTraj) {
   std::cout << extremum << std::endl;
 
   MincoSnapTrajectory traj = raceplanner->getTrajectory();
-  traj.save(traj_path);  
+  std::cout << traj_path << "\n";
+  ASSERT_TRUE(traj.save(traj_path));  
   traj.saveSegments(wpt_path, raceparams->tprefine.piecesPerSegment);
 }
 

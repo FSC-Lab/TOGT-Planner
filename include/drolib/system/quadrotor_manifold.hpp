@@ -2,15 +2,19 @@
 
 #include <Eigen/Eigen>
 #include "drolib/system/quadrotor_params.hpp"
-#include "drolib/type/quad_state.hpp"
-#include "drolib/type/command.hpp"
-#include "drolib/type/set_point.hpp"
-#include "drolib/math/gravity.hpp"
+#include "cyblib/uav/setpoint.hpp"
 #include "drolib/planner/traj_params.hpp"
+#include "drolib/type/types.hpp"
 
 #include <cmath>
 
 namespace drolib {
+
+struct JerkSnap {
+  Eigen::Vector3d jerk;
+  Eigen::Vector3d snap;
+};
+
 
 class QuadManifold {
  public:
@@ -18,10 +22,10 @@ class QuadManifold {
   QuadManifold(const QuadParams params);
   ~QuadManifold();
 
-  bool toStateWithTiltYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const;
+  bool toStateWithTiltYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, cyb::Setpoint &output, JerkSnap &js) const;
   mutable Eigen::Quaterniond q_tilt_last_{1, 0, 0, 0};
 
-  bool toStateWithTrueYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const;
+  bool toStateWithTrueYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, cyb::Setpoint &output, JerkSnap &js) const;
 
   bool computeThrustBodyrates(const PVAJS &input, const Eigen::Vector3d& yaw, double& thrust, double& bodyrateXY, double& bodyrateZ) const;
 

@@ -2,6 +2,19 @@
 
 namespace drolib {
 
+namespace {
+
+// NOTE: Cyblib API does not nest jerk and snap in state
+// We assume users will not specify snap/jerk as initial/terminal states
+PVAJ toPVAJ(const cyb::QuadState &state) {
+  PVAJ pvaj;
+  pvaj.col(0) = state.position();
+  pvaj.col(1) = state.velocity();
+  pvaj.col(2) = state.linear_accel();
+  return pvaj;
+}
+}
+
 RacePlanner::RacePlanner(const RaceParams &params, double sampleTime)
     : params_(params), trajSampleTimeSec_(sampleTime) {
   quad_ = QuadManifold(params.qp);  
@@ -9,7 +22,7 @@ RacePlanner::RacePlanner(const RaceParams &params, double sampleTime)
 
 bool RacePlanner::solve(std::shared_ptr<RaceTrack> track,
                         const TrajParams &tparams, const LbfgsParams &lbfgs) {
-  return solver_.solve(track->initState.toPVAJ(), track->endState.toPVAJ(),
+  return solver_.solve(toPVAJ(track->initState), toPVAJ(track->endState),
                        quad_, tparams, lbfgs);
 }
 

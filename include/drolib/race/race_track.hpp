@@ -7,7 +7,7 @@
 #include "drolib/file/file_utils.hpp"
 #include "drolib/planner/traj_data.hpp"
 #include "drolib/polynomial/piecewise_polynomial.hpp"
-#include "drolib/type/quad_state.hpp"
+#include "cyblib/uav/quad_state.hpp"
 #include "drolib/utils/logger.hpp"
 #include <unordered_map>
 
@@ -16,7 +16,7 @@ class RaceTrack : public ParameterBase {
 public:
 
   explicit RaceTrack(const fs::path &filename);
-  RaceTrack(const QuadState &init, const QuadState &end);
+  RaceTrack(const cyb::QuadState &init, const cyb::QuadState &end);
   RaceTrack() = default;
   ~RaceTrack() = default;
 
@@ -115,8 +115,8 @@ public:
   std::vector<std::shared_ptr<CorridorBase>> gates;
   std::vector<std::shared_ptr<CorridorBase>> corridors;
   std::vector<std::pair<int, int>> segments;
-  QuadState initState;
-  QuadState endState;
+  cyb::QuadState initState;
+  cyb::QuadState endState;
   double minCorDist{0.0};
 
 private:

@@ -6,8 +6,8 @@
 #include "drolib/race/race_params.hpp"
 #include "drolib/system/minco_snap_trajectory.hpp"
 #include "drolib/system/quadrotor_manifold.hpp"
-#include "drolib/type/quad_state.hpp"
-#include "drolib/type/set_point.hpp"
+#include "cyblib/uav/quad_state.hpp"
+#include "cyblib/uav/setpoint.hpp"
 #include "drolib/utils/logger.hpp"
 #include "drolib/utils/timer.hpp"
 

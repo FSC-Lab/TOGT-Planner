@@ -26,22 +26,21 @@ bool QuadManifold::computeThrustBodyrates(const PVAJS &input, const Eigen::Vecto
   return true;
 }
 
-bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, cyb::Setpoint& output, JerkSnap& js) const {
   output.state.t = t;
-  output.input.t = t;
 
-  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
-  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
-  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
-  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
-  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
-  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.position();
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.velocity();
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.linear_accel();
+  Eigen::Ref<Eigen::Vector3d> jer = js.jerk;
+  Eigen::Ref<Eigen::Vector3d> sna = js.snap;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.body_rate();
   // Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
-  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.torque();
 
-  Eigen::Vector3d& omgInput = output.input.omega; 
-  Eigen::Vector4d& thrusts = output.input.thrusts; 
-  double& collective_thrust = output.input.collective_thrust; 
+  // Eigen::Vector3d& omgInput = output.input.omega;
+  cyb::VectorRef thrusts = output.state.motor_thrusts();
+  double& collective_thrust = output.state.collective_thrust(); 
 
   pos = input.col(0);
   vel = input.col(1);  
@@ -52,7 +51,7 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
   const double& yawAng = yaw(0);
   const double& yawRate = yaw(1);
 
-  const Eigen::Vector3d accCmd = acc - GVEC;
+  const Eigen::Vector3d accCmd = acc - cyb::kGravityVec;
   // collective_thrust = accCmd.norm() * params_.mass;
   collective_thrust = accCmd.norm(); // thrust-mass ratio
   thrusts.setConstant(NAN);
@@ -72,7 +71,7 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
   omg.y() = 1.0 / accCmd.norm() * x_B.dot(jer);
   omg.z() = 1.0 / (y_c.cross(z_B)).norm() *
             (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B));
-  omgInput = omg;
+  // omgInput = omg;
   tau.setConstant(NAN);
 
   return true;
@@ -89,14 +88,16 @@ double QuadManifold::computePenalityCost(
   Eigen::Vector3d gradOmg;
   Eigen::Vector4d gradQuat;
   Eigen::Vector4d gradThrusts;
-  Setpoint setpoint;
-  toStateWithTiltYaw(0.0, pvajs, yaw, setpoint);
+  cyb::Setpoint setpoint;
+  JerkSnap js;
+  toStateWithTiltYaw(0.0, pvajs, yaw, setpoint, js);
 
-  cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
-  cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
-  cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
-  cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-  cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+  cost += addVelocityPenalities(setpoint.state.velocity(), params, gradVel);
+  cost += addRotationPenalities(setpoint.state.orientation(), params, gradQuat);
+  cost += addBodyratePenalities(setpoint.state.body_rate(), params, gradOmg);
+  cost +=
+      addThrustsPenalities(setpoint.state.motor_thrusts(), params, gradThrusts);
+  cost += addBoundaryPenalities(setpoint.state.position(), params, gradPos);
 
   backPropagate(gradPos, gradVel, gradQuat, gradOmg,
                           gradThrusts, gradTotalPos, gradTotalVel,
@@ -114,12 +115,14 @@ double QuadManifold::computeSimplePenalityCost(
   Eigen::Vector4d gradQuat = Eigen::Vector4d::Zero();
   Eigen::Vector3d gradOmg;
   double gradThrust;
-  Setpoint setpoint;
-  toStateWithTiltYaw(0.0, pvajs, yaw, setpoint);
+  cyb::Setpoint setpoint;
+  JerkSnap js;
+
+  toStateWithTiltYaw(0.0, pvajs, yaw, setpoint, js);
 
   // cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
-  cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
-  cost += addThrustPenality(setpoint.input.collective_thrust, params, gradThrust);
+  cost += addBodyratePenalities(setpoint.state.body_rate(), params, gradOmg);
+  cost += addThrustPenality(setpoint.state.collective_thrust(), params, gradThrust);
 
   gradTotalPos.setZero();
   gradTotalVel.setZero();
@@ -176,7 +179,7 @@ double QuadManifold::computeRobustSimplePenalityCost(
   // alpha = a + gzW
   alpha0 = a0;
   alpha1 = a1;
-  alpha2 = a2 + G;
+  alpha2 = a2 + cyb::kGravity;
   alpha << alpha0, alpha1, alpha2;
 
   alpha_sqr0 = alpha0 * alpha0;
@@ -200,9 +203,8 @@ double QuadManifold::computeRobustSimplePenalityCost(
   zB2 = alpha2 / alpha_norm_1;
   zB << zB0, zB1, zB2;
 
-  thrust = zB0 * params_.mass * a0 
-                    + zB1 * params_.mass * a1
-                    + zB2 * params_.mass * (a2 + G);
+  thrust = zB0 * params_.mass * a0 + zB1 * params_.mass * a1 +
+           zB2 * params_.mass * (a2 + cyb::kGravity);
   zB2_1 = zB2 + 1;
 
   if (fabs(zB2_1) > 0.001) {
@@ -402,7 +404,7 @@ double QuadManifold::computeRobustPenalityCost(
   // alpha = a + gzW
   alpha0 = a0;
   alpha1 = a1;
-  alpha2 = a2 + G;
+  alpha2 = a2 + cyb::kGravity;
   alpha << alpha0, alpha1, alpha2;
 
   alpha_sqr0 = alpha0 * alpha0;
@@ -428,7 +430,7 @@ double QuadManifold::computeRobustPenalityCost(
 
   thrust = zB0 * params_.mass * a0 
                     + zB1 * params_.mass * a1
-                    + zB2 * params_.mass * (a2 + G);
+                    + zB2 * params_.mass * (a2 + cyb::kGravity);
   zB2_1 = zB2 + 1;
 
   if (fabs(zB2_1) > 0.001) {
@@ -781,22 +783,21 @@ bool QuadManifold::smoothedL1(const double &x, const double &mu, double &f,
 
 }
 /****************************************************/
-bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, cyb::Setpoint &output, JerkSnap &js) const {
   output.state.t = t;
-  output.input.t = t;
 
-  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
-  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
-  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
-  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
-  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
-  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
-  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
-  Eigen::Ref<Eigen::Vector3d> tau = output.state.tau;
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.position();
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.velocity();
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.linear_accel();
+  Eigen::Ref<Eigen::Vector3d> jer = js.jerk;
+  Eigen::Ref<Eigen::Vector3d> sna = js.snap;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.body_rate();
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.orientation();
+  Eigen::Ref<Eigen::Vector3d> tau = output.state.torque();
 
-  Eigen::Vector3d& omgInput = output.input.omega; 
-  Eigen::Vector4d& thrusts = output.input.thrusts; 
-  double& thrust = output.input.collective_thrust; 
+  // Eigen::Vector3d& omgInput = output.input.omega; 
+  cyb::VectorRef thrusts = output.state.motor_thrusts(); 
+  double& thrust = output.state.collective_thrust(); 
 
   pos = input.col(0);
   vel = input.col(1);  
@@ -825,7 +826,7 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   // alpha = a + gzW
   alpha0 = a0;
   alpha1 = a1;
-  alpha2 = a2 + G;
+  alpha2 = a2 + cyb::kGravity;
   alpha << alpha0, alpha1, alpha2;
 
   alpha_sqr0 = alpha0 * alpha0;
@@ -861,7 +862,7 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
 
   thrust = zB0 * params_.mass * a0 
               + zB1 * params_.mass * a1
-              + zB2 * params_.mass * (a2 + G);
+              + zB2 * params_.mass * (a2 + cyb::kGravity);
 
   // if (thrust < 1.0e-3) {
   //   //Free fall situation
@@ -953,7 +954,7 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   omg(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
   omg(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
   omg(2) = tmp_omg_3 / omg_den + dpsi;
-  omgInput = omg;
+  // omgInput = omg;
 
   // derivative of torque w.r.t. omg
   mat_tor_w << 0.0, inertiaGapZY * omg(2), inertiaGapZY * omg(1),

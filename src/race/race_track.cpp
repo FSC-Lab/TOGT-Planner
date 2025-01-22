@@ -1,12 +1,51 @@
 #include "drolib/race/race_track.hpp"
+#include <cyblib/math/rotation.hpp>
 
 namespace drolib {
+
+namespace details {
+void write(const cyb::QuadState&state, const std::string &name, std::ofstream& os) {
+  const Eigen::Vector3d rpy = quaternionToEulerAnglesRPY(state.q());
+  const double cthrustmass = (state.linear_accel() + Eigen::Vector3d(0.0, 0.0, 9.8066)).norm();
+  os.precision(5);
+  os << name << ":\n"
+      << "  pos: [" << state.position().x() << ", " << state.position().y() << ", " << state.position().z() << "]\n"
+      << "  vel: [" << state.velocity().x() << ", " << state.velocity().y() << ", " << state.velocity().z() << "]\n"
+      << "  cthrustmass: " << cthrustmass << "\n"
+      << "  euler: [" << rpy.x() << ", " << rpy.y() << ", " << rpy.z() << "]\n\n";
+  os.precision();
+}
+
+bool load(cyb::QuadState&state, const Yaml& yaml) {
+  if (yaml.isNull()) return false;
+
+  state.setZero();
+  bool got{true};
+  cyb::Vector3 tmp;
+  got &= yaml["pos"].getIfDefined(tmp);
+  state.position() = tmp;
+  got &= yaml["vel"].getIfDefined(tmp);
+  state.velocity() = tmp;
+
+  Eigen::Vector3d rpy;
+  double cthrustmass{0.0};
+  got &= yaml["cthrustmass"].getIfDefined(cthrustmass);
+  got &= yaml["euler"].getIfDefined(rpy);
+
+  state.q(cyb::eulerAnglesRPYToQuaternion(deg2rad(rpy)));
+  state.linear_accel() = state.q() * Eigen::Vector3d(0.0, 0.0, cthrustmass) - Eigen::Vector3d(0.0, 0.0, 9.8066);
+  // NOTE: Cyblib API does not nest jerk and snap in state; We assume no sane user will specify jerk/snap in the yaml file
+  // state.jerk().setZero();
+
+  return got;
+}
+}
 
 RaceTrack::RaceTrack(const fs::path& filename) {
   load(filename);
 }
 
-RaceTrack::RaceTrack(const QuadState& init, const QuadState& end) {
+RaceTrack::RaceTrack(const cyb::QuadState& init, const cyb::QuadState& end) {
   segments.clear();
   gates.clear();
   initState = init;
@@ -129,7 +168,7 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
 
 bool RaceTrack::getData(const double speedGuess, TrajData &tdata) {
   assignWaypoints(tdata);
-  tdata.initData(initState.p, endState.p, speedGuess);
+  tdata.initData(initState.position(), endState.position(), speedGuess);
   return true;
 }
 
@@ -180,8 +219,8 @@ void RaceTrack::save(const std::string &filename) {
   std::ofstream file;
   file.open(filename.c_str());
   
-  initState.write("initState", file);
-  endState.write("endState", file);
+  details::write(initState, "initState", file);
+  details::write(endState, "endState", file);
   file.precision(2);
   file << "orders: [";
   for (size_t i{0}; i < size_t(gates.size()); ++i) {
@@ -209,8 +248,8 @@ bool RaceTrack::load(const Yaml &yaml) {
 
   segments.clear();
 
-  initState.load(yaml["initState"]);
-  endState.load(yaml["endState"]);
+  details::load(initState, yaml["initState"]);
+  details::load(endState, yaml["endState"]);
 
   std::vector<std::string> orders;
   if (yaml["orders"].size() == 0) {
@@ -250,12 +289,12 @@ void RaceTrack::initCorridors(const int midpoints) {
   endPoints.resize(gates.size() + 1);
 
   bool ret = true;
-  startPoints[0] = initState.p;
+  startPoints[0] = initState.position();
   for (size_t i{0}; i < gates.size(); ++i) {
     ret &= gates[i]->lastPoint(startPoints[i + 1]);
     ret &= gates[i]->firstPoint(endPoints[i]);
   }
-  endPoints[gates.size()] = endState.p;
+  endPoints[gates.size()] = endState.position();
 
   corridors.clear();
   // corridors.resize(gates.size() + 1);

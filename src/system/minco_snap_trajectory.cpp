@@ -2,6 +2,11 @@
 
 namespace drolib {
 
+template <typename T>
+auto getTiltedAngle(const T& qx) {
+  return std::acos(1.0 - 2.0 * (qx[1] * qx[1] + qx[2] * qx[2]));
+}
+
 MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name, 
                     const QuadManifold& quad,
                     const TrajData& data,
@@ -54,7 +59,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   setpoints.clear();
   setpoints.reserve(nSamples);
 
-  Setpoint setpoint;
+  cyb::Setpoint  setpoint;
   PVAJS pvajs;
   Eigen::Vector3d yaw;
 
@@ -73,6 +78,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   Eigen::Vector3d last_pos = polys.getPos(t);
   double length{0.0};
 
+  JerkSnap js;
   for (int i = 0; i <= nSamples; ++i) {
     pvajs = polys.getPVAJS(t);
 
@@ -88,18 +94,19 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
     }
 
     if (rotation_type == RotationType::TILT_HEADING) {
-      quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
-      extremum.thrusts.add(setpoint.input.thrusts);
+      quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint, js);
+      extremum.thrusts.add(setpoint.state.motor_thrusts());
     } else {
-      quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
-      extremum.collectiveThrust.add(setpoint.input.collective_thrust);
+      quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint, js);
+      extremum.collectiveThrust.add(setpoint.state.collective_thrust());
     }
-    extremum.tilt.add(setpoint.state.getTiltedAngle());
-    extremum.omg.add(setpoint.input.omega);
+    extremum.tilt.add(getTiltedAngle(setpoint.state.orientation()));
+    extremum.omg.add(setpoint.state.body_rate());
     extremum.rpy.add(rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q())));
 
     // Add a setpoint
     setpoints.push_back(setpoint);
+    js_vec.push_back(js);
 
     dt = std::min(T - t, sampleTimeSec);
     t += dt;
@@ -111,11 +118,12 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(
   // Add the last setpoint
   pvajs = polys.getPVAJS(t);
   if (rotation_type == RotationType::TILT_HEADING) {
-    quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
+    quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint, js);
   } else {
-    quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
+    quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint, js);
   }
   setpoints.push_back(setpoint);
+  js_vec.push_back(js);
   return extremum;
 }
 
@@ -171,6 +179,7 @@ bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
 
 bool MincoSnapTrajectory::saveSegments(const std::string &filename, const int piecesPerSegment) {
   if (!polys.valid()) {
+    std::cout << "invalid polys\n";
     return false;
   }
   Eigen::VectorXd durations = polys.getDurations();
@@ -208,9 +217,11 @@ bool MincoSnapTrajectory::saveSegments(const std::string &filename, const int pi
     timestamps.push_back(timestamps.back() + raceDurations[i]);
   }
 
-  std::ofstream file;
+  std::ofstream file(filename);
   // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
-  file.open(filename.c_str());
+  if (!file.is_open()) {
+    return false;
+  }
   file.precision(4);
 
   file << "waypoints: [";
@@ -258,9 +269,6 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
     return false;
   }
 
-  if (!setpoints.front().input.isSingleRotorThrusts()) {
-    return false;
-  }
 
   std::ofstream file;
   file.open(filename.c_str());
@@ -269,16 +277,18 @@ bool MincoSnapTrajectory::save(const std::string &filename) {
        << "u_1,u_2,u_3,u_4,"
        << "jerk_x,jerk_y,jerk_z,snap_x,snap_y,snap_z\n";
   Eigen::Vector3d accRot = Eigen::Vector3d::Zero();
-  for (const auto &setpoint : setpoints) {
+  for (int i = 0; i < static_cast<int>(setpoints.size()); ++i) {
+    const auto &setpoint = setpoints[i];
+    const auto &js = js_vec[i];
     const double &t = setpoint.state.t;
-    const Eigen::Vector3d &pos = setpoint.state.p;
-    const Eigen::Vector3d &vel = setpoint.state.v;
-    const Eigen::Vector3d &acc = setpoint.state.a;
-    const Eigen::Vector3d &jer = setpoint.state.j;
-    const Eigen::Vector3d &sna = setpoint.state.s;
-    const Eigen::Vector4d &quat = setpoint.state.qx;
-    const Eigen::Vector3d &omg = setpoint.input.omega;
-    const Eigen::Vector4d &thrusts = setpoint.input.thrusts;
+    const Eigen::Vector3d &pos = setpoint.state.position();
+    const Eigen::Vector3d &vel = setpoint.state.velocity();
+    const Eigen::Vector3d &acc = setpoint.state.linear_accel();
+    const Eigen::Vector3d &jer = js.jerk;
+    const Eigen::Vector3d &sna = js.snap;
+    const Eigen::Vector4d &quat = setpoint.state.orientation();
+    const Eigen::Vector3d &omg = setpoint.state.body_rate();
+    const Eigen::Vector4d &thrusts = setpoint.state.motor_thrusts();
     file << std::setprecision(5) << t << "," << std::setprecision(5) << pos(0)
          << "," << pos(1) << "," << pos(2) << "," << quat(0) << "," << quat(1)
          << "," << quat(2) << "," << quat(3) << "," << vel(0) << "," << vel(1)

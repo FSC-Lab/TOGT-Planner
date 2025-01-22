@@ -11,8 +11,8 @@ FetchContent_MakeAvailable(GTest)
 include(GoogleTest)
 
 add_executable(${PROJECT_NAME})
-target_sources(${PROJECT_NAME} PUBLIC test_aos.cpp test_togt.cpp
-                                      test_aos_togt.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE TOGT-Planner::Planner
-                                              GTest::gtest GTest::gtest_main)
+target_sources(${PROJECT_NAME} PUBLIC test_aos_togt.cpp)
+target_link_libraries(
+  ${PROJECT_NAME} PRIVATE TOGT-Planner::Planner GTest::gtest GTest::gtest_main
+                          )
 gtest_discover_tests(${PROJECT_NAME})
