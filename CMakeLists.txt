@@ -1,14 +1,8 @@
 cmake_minimum_required(VERSION 3.24.0)
 project(TOGT-Planner)
 
-include(FetchContent)
+find_package(cyblib REQUIRED)
 
-FetchContent_Declare(
-  Eigen3
-  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-  GIT_TAG v3.4.0
-  SYSTEM FIND_PACKAGE_ARGS NAMES Eigen3 CONFIG 3.4.0)
-FetchContent_MakeAvailable(Eigen3)
 add_library(TOGT-Planner_Shapes)
 target_sources(
   TOGT-Planner_Shapes
@@ -115,7 +109,7 @@ target_sources(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/timer.hpp)
 target_compile_features(TOGT-Planner_Planner PUBLIC cxx_std_17)
-target_link_libraries(TOGT-Planner_Planner PUBLIC Eigen3::Eigen
+target_link_libraries(TOGT-Planner_Planner PUBLIC cyblib::core
                                                   TOGT-Planner::Shapes)
 
 set_target_properties(TOGT-Planner_Planner PROPERTIES EXPORT_NAME Planner)
