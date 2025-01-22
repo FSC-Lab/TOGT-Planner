@@ -55,7 +55,6 @@ target_sources(
          src/system/quadrotor_manifold.cpp
          src/system/quadrotor_params.cpp
          src/type/command.cpp
-         src/type/quad_state.cpp
          src/utils/logger.cpp
          src/utils/timer.cpp
   PRIVATE
@@ -103,7 +102,6 @@ target_sources(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/command.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/imu_sample.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/odom.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/quad_state.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/set_point.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/types.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/logger.hpp
