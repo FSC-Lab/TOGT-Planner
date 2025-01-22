@@ -54,7 +54,6 @@ target_sources(
          src/system/minco_snap_trajectory.cpp
          src/system/quadrotor_manifold.cpp
          src/system/quadrotor_params.cpp
-         src/type/command.cpp
          src/utils/logger.cpp
          src/utils/timer.cpp
   PRIVATE
@@ -99,10 +98,8 @@ target_sources(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/minco_snap_trajectory.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/quadrotor_manifold.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/system/quadrotor_params.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/command.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/imu_sample.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/odom.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/set_point.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/type/types.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/logger.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/drolib/utils/timer.hpp)
