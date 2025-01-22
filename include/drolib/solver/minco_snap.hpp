@@ -11,7 +11,6 @@ namespace drolib {
 // MINCO for s=4 and non-uniform time
 class MincoSnap {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   MincoSnap() = default;
   ~MincoSnap() { A.destroy(); }
 

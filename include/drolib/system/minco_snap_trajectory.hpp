@@ -5,14 +5,13 @@
 #include "drolib/rotation/rotation_utils.h"
 #include "drolib/type/types.hpp"
 
-#include "drolib/type/set_point.hpp"
+#include "cyblib/uav/setpoint.hpp"
 #include "drolib/system/quadrotor_manifold.hpp"
 #include "drolib/math/min_max_recorder.hpp"
 // #include <numeric>
 namespace drolib {
 
 struct TrajExtremum {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   double maxTime{NAN};
   double length{NAN};
   MinMaxRecorder<double> vel;
@@ -68,7 +67,6 @@ struct TrajExtremum {
 };
 
 struct MincoSnapTrajectory {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   enum RotationType : uint8_t { TILT_HEADING = 0, ROLL_PITCH_YAW = 1 };
   enum HeadingType : uint8_t {
     CONSTANT_HEADING = 0,

@@ -8,7 +8,6 @@ namespace drolib {
 
 class QuadParams : public ParameterBase {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   QuadParams() = default;
 
   using ParameterBase::load;

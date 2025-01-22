@@ -9,7 +9,6 @@ namespace spline {
 
 class CubicSpline3D {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CubicSpline3D() {}
   ~CubicSpline3D() {}
 

@@ -10,7 +10,6 @@
 namespace drolib {
 
 struct TrajData {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   TrajData() = default;
 
   bool allocateSpace();
