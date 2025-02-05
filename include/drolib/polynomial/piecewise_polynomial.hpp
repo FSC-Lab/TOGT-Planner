@@ -5,13 +5,19 @@
 
 namespace drolib {
 
-using PVAJ = Eigen::Matrix<double, 3, 4>;
-using PVAJS = Eigen::Matrix<double, 3, 5>;
+// using PVAJ3D = Eigen::Matrix<double, 3, 4>;
+// using PVAJS3D = Eigen::Matrix<double, 3, 5>;
 
-template <int D>
+// using PVAJ1D = Eigen::Matrix<double, 1, 4>;
+// using PVAJS1D = Eigen::Matrix<double, 1, 5>;
+
+template <int DEG, int DIM=3>
 class PiecewisePolynomial {
  private:
-  using Pieces = std::vector<Polynomial<D>>;
+  using Pieces = std::vector<Polynomial<DEG, DIM>>;
+  using Point = typename Polynomial<DEG, DIM>::Point;
+  using StatePVAJ = Eigen::Matrix<double, DIM, 4>;
+  using StatePVAJS = Eigen::Matrix<double, DIM, 5>;
   Pieces pieces;
 
  public:
@@ -19,7 +25,7 @@ class PiecewisePolynomial {
 
   PiecewisePolynomial(
       const std::vector<double>& durations,
-      const std::vector<typename Polynomial<D>::CoefficientMat>& cMats) {
+      const std::vector<typename Polynomial<DEG, DIM>::CoefficientMat>& cMats) {
     const int N = std::min(durations.size(), cMats.size());
     pieces.reserve(N);
     for (int i = 0; i < N; i++) {
@@ -33,11 +39,11 @@ class PiecewisePolynomial {
 
   inline bool valid() const { return !pieces.empty(); }  
 
-  inline const Polynomial<D> &operator[](int i) const {
+  inline const Polynomial<DEG, DIM> &operator[](int i) const {
       return pieces[i];
   }
 
-  inline Polynomial<D> &operator[](int i) {
+  inline Polynomial<DEG, DIM> &operator[](int i) {
       return pieces[i];
   }
 
@@ -68,48 +74,34 @@ class PiecewisePolynomial {
     return durations;
   }
 
-  Eigen::Matrix3Xd getPoints() const {
+  Eigen::Matrix<double, DIM, Eigen::Dynamic> getPoints() const {
     const int N = getPieceNum();
-    Eigen::Matrix3Xd positions(3, N + 1);
+    Eigen::Matrix<double, DIM, Eigen::Dynamic> positions(DIM, N + 1);
     int i{0};
     for (const auto& piece : pieces) {
-      positions.col(i) = piece.getCoeffMat().col(D);
+      positions.col(i) = piece.getCoeffMat().col(DEG);
       ++i;
     }
     positions.col(N) = pieces.back().getPos(pieces.back().getDuration());
     return positions;
   }
 
-  Eigen::Matrix3Xd getWaypoints() const {
+  Eigen::Matrix<double, DIM, Eigen::Dynamic> getWaypoints() const {
     const int N = getPieceNum();
-    // if (endpoint = false) {
-    //   Eigen::Matrix3Xd positions(3, N - 1);
-    //   if (N <= 1) {
-    //     return positions;
-    //   }
-    //   for (int i{1}, j{0}; j < N; ++i, ++j) {
-    //     positions.col(j) = pieces[i].getCoeffMat().col(D);
-    //   }
-    //   return positions;
-    // } else {
-    Eigen::Matrix3Xd positions(3, N);
+    Eigen::Matrix<double, DIM, Eigen::Dynamic> positions(DIM, N);
     if (N <= 1) {
       positions.col(N - 1) = pieces.back().getPos(pieces.back().getDuration());
       return positions;
     }
     for (int i{1}, j{0}; j < N - 1; ++i, ++j) {
-      positions.col(j) = pieces[i].getCoeffMat().col(D);
+      positions.col(j) = pieces[i].getCoeffMat().col(DEG);
     }
     positions.col(N - 1) = pieces.back().getPos(pieces.back().getDuration());
     
     return positions;
-    // }
-
-
   }
 
   double getTotalDuration() const {
-    // const int N = getPieceNum();
     double totalDuration = 0.0;
     for (const auto& piece : pieces) {
       totalDuration += piece.getDuration();
@@ -117,52 +109,36 @@ class PiecewisePolynomial {
     return totalDuration;
   }
 
-  // typename Pieces::iterator locatePiece(double& t) {
-  //   const int N = getPieceNum();
-  //   double duration;
-  //   typename Pieces::iterator it = pieces.begin();
-  //   typename Pieces::const_iterator itEnd = pieces.end();
-  //   // TODO: define operator < to simplify the process
-  //   for (; it != itEnd && t > (duration = it->getDuration()); ++it) {
-  //     t -= duration;
-  //   }
-  //   if (it == itEnd) {
-  //     it--;
-  //     t += it->getDuration();
-  //   }
-  //   return it;
-  // }
-
-  // TODO: use const double t
-  Eigen::Vector3d getPos(double t) const {
+  Point getPos(double t) const {
     int pieceIdx = locatePieceIdx(t);
     return pieces[pieceIdx].getPos(t);
   }
 
-  PVAJ getPVAJ(double t) const {
-    return (PVAJ() << getPos(t), getVel(t), getAcc(t), getJer(t)).finished();
+  // TODO(chao): use dynamic dimension
+  StatePVAJ getPVAJ(double t) const {
+    return (StatePVAJ() << getPos(t), getVel(t), getAcc(t), getJer(t)).finished();
   }
 
-  PVAJS getPVAJS(double t) const {
-    return (PVAJS() << getPos(t), getVel(t), getAcc(t), getJer(t), getSna(t)).finished();
+  StatePVAJS getPVAJS(double t) const {
+    return (StatePVAJS() << getPos(t), getVel(t), getAcc(t), getJer(t), getSna(t)).finished();
   }
 
-  Eigen::Vector3d getVel(double t) const {
+  Point getVel(double t) const {
     int pieceIdx = locatePieceIdx(t);
     return pieces[pieceIdx].getVel(t);
   }
 
-  Eigen::Vector3d getAcc(double t) const {
+  Point getAcc(double t) const {
     int pieceIdx = locatePieceIdx(t);
     return pieces[pieceIdx].getAcc(t);
   }
 
-  Eigen::Vector3d getJer(double t) const {
+  Point getJer(double t) const {
     int pieceIdx = locatePieceIdx(t);
     return pieces[pieceIdx].getJer(t);
   }
 
-  Eigen::Vector3d getSna(double t) const {
+  Point getSna(double t) const {
     int pieceIdx = locatePieceIdx(t);
     return pieces[pieceIdx].getSna(t);
   }
@@ -190,8 +166,8 @@ class PiecewisePolynomial {
     return maxAcc;
   }
 
-  bool intersectPlane(const Eigen::Vector3d p, const Eigen::Vector3d v,
-                      double& tt, Eigen::Vector3d& pt) {
+  bool intersectPlane(const Point p, const Point v,
+                      double& tt, Point& pt) {
     for (const auto& piece : pieces) {
       if (piece.intersectPlane(p, v, tt, pt)) {
         return true;
@@ -211,20 +187,20 @@ class PiecewisePolynomial {
   inline void reserve(const int &n) { pieces.reserve(n); }
 
   inline void emplace_back(const double& duration,
-                           const typename Polynomial<D>::CoefficientMat& cMat) {
+                           const typename Polynomial<DEG, DIM>::CoefficientMat& cMat) {
     pieces.emplace_back(duration, cMat);
   }
 
   inline void emplace_front(const double& duration,
-                           const typename Polynomial<D>::CoefficientMat& cMat) {
+                           const typename Polynomial<DEG, DIM>::CoefficientMat& cMat) {
     pieces.emplace_front(duration, cMat);
   }
 
-  inline void append_back(const PiecewisePolynomial<D>& polys) {
+  inline void append_back(const PiecewisePolynomial<DEG, DIM>& polys) {
     pieces.insert(pieces.end(), polys.begin(), polys.end());
   }
 
-  inline void append_front(const PiecewisePolynomial<D>& polys) {
+  inline void append_front(const PiecewisePolynomial<DEG, DIM>& polys) {
     pieces.insert(pieces.begin(), polys.begin(), polys.end());
   }
 
@@ -238,7 +214,7 @@ class PiecewisePolynomial {
     pieces.erase(it, pieces.end());
   }
 
-  inline void push_back(const Polynomial<D>& poly) { pieces.push_back(poly); }
+  inline void push_back(const Polynomial<DEG, DIM>& poly) { pieces.push_back(poly); }
 
   Pieces pop_back(const int n = 1) {
     assert(this->getPieceNum() >= n);
@@ -250,7 +226,7 @@ class PiecewisePolynomial {
     return polynomials;
   }
 
-  PiecewisePolynomial<D> getPieces(const int idx, int num = -1) const {
+  PiecewisePolynomial<DEG, DIM> getPieces(const int idx, int num = -1) const {
     if (num == -1) {
       num = this->getPieceNum() - idx;
     }
@@ -259,13 +235,13 @@ class PiecewisePolynomial {
     for (int i{0}; i < num; ++i) {
       polynomials.push_back(pieces[idx + i]);
     }
-    return PiecewisePolynomial<D>(polynomials);
+    return PiecewisePolynomial<DEG, DIM>(polynomials);
   }
 
   // GaaiLam
-  double getClosestPoint(const Eigen::Vector3d &pt,
+  double getClosestPoint(const Point &pt,
                          int &ii, double &tt,
-                         Eigen::Vector3d &projectedPoint) {
+                         Point &projectedPoint) {
     // std::cout << "pt: " << pt.transpose() << "\n";                    
     double minDist = -1;
     for (int i = 0; i < getPieceNum(); ++i) {
@@ -284,9 +260,9 @@ class PiecewisePolynomial {
     return minDist;
   }
 
-  bool intersectPlane(const Eigen::Vector3d p,
-                      const Eigen::Vector3d v,
-                      int &ii, double &tt, Eigen::Vector3d &pt) {
+  bool intersectPlane(const Point p,
+                      const Point v,
+                      int &ii, double &tt, Point &pt) {
     for (int i = 0; i < getPieceNum(); ++i) {
       const auto &piece = pieces[i];
       if (piece.intersectPlane(p, v, tt, pt)) {
@@ -298,8 +274,8 @@ class PiecewisePolynomial {
   }
 
 
-  // Eigen::Matrix3Xd waypoints() {
-  //   Eigen::Matrix3Xd points;
+  // Eigen::Matrix<double, DIM, Eigen::Dynamic> waypoints() {
+  //   Eigen::Matrix<double, DIM, Eigen::Dynamic> points;
   //   points.resize(3, getPieceNum() + 1);
   //   int i{0};
   //   auto it = pieces.begin();

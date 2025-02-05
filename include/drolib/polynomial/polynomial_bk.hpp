@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DROLIB_POLYNOMIAL_POLYNOMIAL_20COPY_HPP_
+#define DROLIB_POLYNOMIAL_POLYNOMIAL_20COPY_HPP_
 
 #include <Eigen/Eigen>
 #include <cfloat>
@@ -9,13 +10,12 @@
 
 namespace drolib {
 
-template <int DEG, int DIM=3>
+template <int D>
 class Polynomial {
  public:
-  using CoefficientMat = Eigen::Matrix<double, DIM, DEG + 1>;
-  using VelCoefficientMat = Eigen::Matrix<double, DIM, DEG>;
-  using AccCoefficientMat = Eigen::Matrix<double, DIM, DEG - 1>;
-  using Point = Eigen::Matrix<double, DIM, 1>;
+  using CoefficientMat = Eigen::Matrix<double, 3, D + 1>;
+  using VelCoefficientMat = Eigen::Matrix<double, 3, D>;
+  using AccCoefficientMat = Eigen::Matrix<double, 3, D - 1>;
 
  private:
   double duration;
@@ -27,9 +27,9 @@ class Polynomial {
   Polynomial(double dur, const CoefficientMat &cMat)
       : duration(dur), coeffMat(cMat) {}
 
-  inline int getDim() const { return DIM; }
+  inline int getDim() const { return 3; }
 
-  inline int getDegree() const { return DEG; }
+  inline int getDegree() const { return D; }
 
   inline double getDuration() const { return duration; }
 
@@ -38,30 +38,28 @@ class Polynomial {
   VelCoefficientMat getVelCoeffMat() const {
     VelCoefficientMat velCoeffMat;
     int n = 1;
-    for (int i = DEG - 1; i >= 0; i--) {
+    for (int i = D - 1; i >= 0; i--) {
       velCoeffMat.col(i) = n * coeffMat.col(i);
       n++;
     }
     return velCoeffMat;
   }
 
-  Point getPos(const double &t) const {
-    Point pos;
-    pos.setZero();
+  Eigen::Vector3d getPos(const double &t) const {
+    Eigen::Vector3d pos(0.0, 0.0, 0.0);
     double tn = 1.0;
-    for (int i = DEG; i >= 0; i--) {
+    for (int i = D; i >= 0; i--) {
       pos += tn * coeffMat.col(i);
       tn *= t;
     }
     return pos;
   }
 
-  Point getVel(const double &t) const {
-    Point vel;
-    vel.setZero();
+  Eigen::Vector3d getVel(const double &t) const {
+    Eigen::Vector3d vel(0.0, 0.0, 0.0);
     double tn = 1.0;
     int n = 1;
-    for (int i = DEG - 1; i >= 0; i--) {
+    for (int i = D - 1; i >= 0; i--) {
       vel += n * tn * coeffMat.col(i);
       tn *= t;
       n++;
@@ -69,13 +67,12 @@ class Polynomial {
     return vel;
   }
 
-  Point getAcc(const double &t) const {
-    Point acc;
-    acc.setZero();
+  Eigen::Vector3d getAcc(const double &t) const {
+    Eigen::Vector3d acc(0.0, 0.0, 0.0);
     double tn = 1.0;
     int m = 1;
     int n = 2;
-    for (int i = DEG - 2; i >= 0; i--) {
+    for (int i = D - 2; i >= 0; i--) {
       acc += m * n * tn * coeffMat.col(i);
       tn *= t;
       m++;
@@ -84,14 +81,13 @@ class Polynomial {
     return acc;
   }
 
-  Point getJer(const double &t) const {
-    Point jer;
-    jer.setZero();
+  Eigen::Vector3d getJer(const double &t) const {
+    Eigen::Vector3d jer(0.0, 0.0, 0.0);
     double tn = 1.0;
     int l = 1;
     int m = 2;
     int n = 3;
-    for (int i = DEG - 3; i >= 0; i--) {
+    for (int i = D - 3; i >= 0; i--) {
       jer += l * m * n * tn * coeffMat.col(i);
       tn *= t;
       l++;
@@ -101,15 +97,14 @@ class Polynomial {
     return jer;
   }
 
-  Point getSna(const double &t) const {
-    Point sna;
-    sna.setZero();
+  Eigen::Vector3d getSna(const double &t) const {
+    Eigen::Vector3d sna(0.0, 0.0, 0.0);
     double tn = 1.0;
     int l = 1;
     int m = 2;
     int n = 3;
     int o = 4;
-    for (int i = DEG - 4; i >= 0; i--) {
+    for (int i = D - 4; i >= 0; i--) {
       sna += l * m * n * o * tn * coeffMat.col(i);
       tn *= t;
       l++;
@@ -123,7 +118,7 @@ class Polynomial {
   CoefficientMat normalizePosCoeffMat() const {
     CoefficientMat nPosCoeffsMat;
     double t = 1.0;
-    for (int i = DEG; i >= 0; i--) {
+    for (int i = D; i >= 0; i--) {
       nPosCoeffsMat.col(i) = coeffMat.col(i) * t;
       t *= duration;
     }
@@ -134,7 +129,7 @@ class Polynomial {
     VelCoefficientMat nVelCoeffMat;
     int n = 1;
     double t = duration;
-    for (int i = DEG - 1; i >= 0; i--) {
+    for (int i = D - 1; i >= 0; i--) {
       nVelCoeffMat.col(i) = n * coeffMat.col(i) * t;
       t *= duration;
       n++;
@@ -147,7 +142,7 @@ class Polynomial {
     int n = 2;
     int m = 1;
     double t = duration * duration;
-    for (int i = DEG - 2; i >= 0; i--) {
+    for (int i = D - 2; i >= 0; i--) {
       nAccCoeffMat.col(i) = n * m * coeffMat.col(i) * t;
       n++;
       m++;
@@ -267,21 +262,21 @@ class Polynomial {
     }
   }
 
-  double getClosestPoint(const Point &pt, double &tt,
-                         Point &projectedPoint) {
+  double getClosestPoint(const Eigen::Vector3d &pt, double &tt,
+                         Eigen::Vector3d &projectedPoint) {
     // std::cout << "piece getClosestPoint\n";                     
     // 2*(p-p0)^T * \dot{p} = 0
     auto l_coeff = getCoeffMat();
     // std::cout << "l_coeff: \n" << l_coeff << "\n";
 
-    // std::cout << "l_coeff.col(DEG): " << l_coeff.col(DEG) << "\n";
-    l_coeff.col(DEG) = l_coeff.col(DEG) - pt;
+    // std::cout << "l_coeff.col(D): " << l_coeff.col(D) << "\n";
+    l_coeff.col(D) = l_coeff.col(D) - pt;
 
     auto r_coeff = getVelCoeffMat();
     // std::cout << "r_coeff: \n" << r_coeff << "\n";
 
 
-    Eigen::VectorXd eq = Eigen::VectorXd::Zero(2 * DEG);
+    Eigen::VectorXd eq = Eigen::VectorXd::Zero(2 * D);
     for (int j = 0; j < l_coeff.rows(); ++j) {
       eq = eq + RootFinder::polyConv(l_coeff.row(j), r_coeff.row(j));
     }
@@ -309,7 +304,7 @@ class Polynomial {
         continue;
       }
       // std::cout << "find min!" << std::endl;
-      Point p = getPos(root);
+      Eigen::Vector3d p = getPos(root);
       // std::cout << "p: " << p.transpose() << std::endl;
       double distance = (p - pt).norm();
       if (distance < minDist || minDist < 0) {
@@ -321,11 +316,11 @@ class Polynomial {
     return minDist;
   }
 
-  bool intersectPlane(const Point p, const Point v,
-                      double &tt, Point &pt) const {
+  bool intersectPlane(const Eigen::Vector3d p, const Eigen::Vector3d v,
+                      double &tt, Eigen::Vector3d &pt) const {
     // (pt - p)^T * v = 0
     auto coeff = getCoeffMat();
-    coeff.col(DEG) = coeff.col(DEG) - p;  // reset the origin to p
+    coeff.col(D) = coeff.col(D) - p;  // reset the origin to p
     Eigen::VectorXd eq =
         coeff.transpose() * v;  // v is the normal vector of the plan
     double l = -0.0625;
@@ -347,3 +342,6 @@ class Polynomial {
 };
 
 }  // namespace drolib
+
+
+#endif  /* DROLIB_POLYNOMIAL_POLYNOMIAL_20COPY_HPP_ */

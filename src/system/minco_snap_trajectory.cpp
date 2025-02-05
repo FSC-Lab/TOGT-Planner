@@ -34,13 +34,14 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   const double T = polys.getTotalDuration();
   extremum.maxTime = T;
-
+// std::cout << "T: " << T << std::endl;
   const int nSamples = T / sampleTimeSec;
+// std::cout << "nSamples: " << nSamples << std::endl;
   setpoints.clear();
   setpoints.reserve(nSamples);
-
+ 
   Setpoint setpoint;
-  PVAJS pvajs;
+  PVAJS3D pvajs;
   Eigen::Vector3d yaw;
 
   double lastHeading = start_yaw;
@@ -79,13 +80,29 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
     // TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
     if (heading_type == HeadingType::FORWARD_HEADING) {
-      // std::cout << "HeadingType::FORWARD_HEADING" << std::endl;
-      yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0,
-          0.0;
-      // std::cout << "FORWARD_HEADING: yaw " << yaw.transpose() << std::endl;
+      // yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0, 0.0;
+      horizon = 1.0;
+      std::cout << "horizon" << horizon << std::endl;
+      double heading{0.0};
+      const auto pvajs_future = polys.getPVAJS(std::min(T, t + horizon));
+
+      std::cout << "t: " << t << std::endl;
+      std::cout << "t_future: " << std::min(T, t + horizon) << std::endl;
+      const Eigen::Vector3d future_pos = pvajs_future.col(0);
+
+      std::cout << "future_pos: " << future_pos.transpose() << ", current: " << pos.transpose() << std::endl;
+      const Eigen::Vector3d diff = future_pos - pos;
+      if (diff.head<2>().norm() > 1e-3) {
+          heading = wrapMinusPiToPi(atan2(diff.y(), diff.x()));
+        } else {
+          heading = lastHeading;
+        }
+        double yaw_rate = wrapAngleDifference(lastHeading, heading) / sampleTimeSec;
+        yaw << heading, yaw_rate, 0.0;
+        // std::cout << "yaw: " << yaw.transpose() << std::endl;
+        lastHeading = heading;
     } else {
       yaw << 0.0, 0.0, 0.0;
-      //  std::cout << "NORMAL_HEADING: yaw " << yaw.transpose() << std::endl;
     }
     // rotation_type = RotationType::ROLL_PITCH_YAW;
     if (rotation_type == RotationType::TILT_HEADING) {
@@ -151,7 +168,7 @@ bool MincoSnapTrajectory::getSetpointVecByDist(const double sampleDistMeter, con
   setpoints_dist.clear();
 
   Setpoint setpoint;
-  PVAJS pvajs;
+  PVAJS3D pvajs;
   Eigen::Vector3d yaw;
 
   const double T = polys.getTotalDuration();

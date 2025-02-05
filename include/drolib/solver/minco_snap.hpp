@@ -343,6 +343,8 @@ class MincoSnap {
                      const Eigen::VectorXd &partialGradByTimes,
                      Eigen::Matrix3Xd &gradByPoints,
                      Eigen::VectorXd &gradByTimes) {
+    gradByPoints.setZero();
+    gradByTimes.setZero();                  
     // gradByPoints.resize(3, N - 1);
     // gradByTimes.resize(N);
     Eigen::MatrixX3d adjGrad = partialGradByCoeffs;

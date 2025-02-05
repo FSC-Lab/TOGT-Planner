@@ -445,7 +445,7 @@ namespace drolib
 
         const int n = x.size();
         const int m = param.mem_size;
-
+std::cout << "A" << std::endl;
         /* Check the input parameters for errors. */
         if (n <= 0)
         {

@@ -33,7 +33,7 @@ class TrajSolver {
     yawTilt = std::make_shared<ConstAngle>(yaw);
   }
   
-  bool solve(const PVAJ &initState, const PVAJ &endState, const QuadManifold &quad,
+  bool solve(const PVAJ3D &initState, const PVAJ3D &endState, const QuadManifold &quad,
              const TrajParams &tparams, const LbfgsParams &lbfgs);
 
   bool getTraejctory(PiecewisePolynomial<POLY_DEG> &trajectory) const {

@@ -1,5 +1,5 @@
 
-bool QuadManifold::toState(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toState(const double t, const PVAJS3D &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
   output.state.t = t;
   output.input.t = t;
 
@@ -150,7 +150,7 @@ bool QuadManifold::toState(const double t, const PVAJS &input, const Eigen::Vect
   
 }
 
-bool QuadManifold::toState(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toState(const double t, const PVAJS3D &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
   output.state.t = t;
   output.input.t = t;
 

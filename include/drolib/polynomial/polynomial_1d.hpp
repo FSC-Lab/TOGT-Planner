@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DROLIB_POLYNOMIAL_POLYNOMIAL_1D_HPP_
+#define DROLIB_POLYNOMIAL_POLYNOMIAL_1D_HPP_
 
 #include <Eigen/Eigen>
 #include <cfloat>
@@ -9,8 +10,8 @@
 
 namespace drolib {
 
-template <int DEG, int DIM=3>
-class Polynomial {
+template <int DIM, int DEG>
+class Polynomial1D {
  public:
   using CoefficientMat = Eigen::Matrix<double, DIM, DEG + 1>;
   using VelCoefficientMat = Eigen::Matrix<double, DIM, DEG>;
@@ -45,7 +46,7 @@ class Polynomial {
     return velCoeffMat;
   }
 
-  Point getPos(const double &t) const {
+  Point getPoint(const double &t) const {
     Point pos;
     pos.setZero();
     double tn = 1.0;
@@ -347,3 +348,5 @@ class Polynomial {
 };
 
 }  // namespace drolib
+
+#endif  /* DROLIB_POLYNOMIAL_POLYNOMIAL_1D_HPP_ */

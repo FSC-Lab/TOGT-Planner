@@ -8,6 +8,33 @@ double TrajSE3Data::averageTime(const Eigen::Vector3d &p0,
   return (p1 - p0).norm() / speed;
 }
 
+bool TrajSE3Data::initDataWithDesiredYaw(const Eigen::Vector3d &startPos,
+                           const Eigen::Vector3d &endPos,
+                           const double desiredyaw,
+                           const double speedGuess) {
+  if (!waypoints.empty()) {
+    T(0) = averageTime(startPos, waypoints.front().point, speedGuess);
+    int i{1};
+    for (; i < getNumPoints(); ++i) {
+      T(i) =
+          averageTime(waypoints[i - 1].point, waypoints[i].point, speedGuess);
+    }
+    T(i) = averageTime(waypoints.back().point, endPos, speedGuess);
+  } else {
+    T(0) = averageTime(startPos, endPos, speedGuess);
+  }
+
+  for (int j{0}; j < getNumPoints(); ++j) {
+    const Eigen::Vector3d &point = waypoints[j].point;
+    P.col(j) = point;
+    Y.col(j) << desiredyaw;
+  }
+
+  calcInitialVal();
+
+  return true;
+}
+
 bool TrajSE3Data::initData(const Eigen::Vector3d &startPos,
                            const Eigen::Vector3d &endPos,
                            const Eigen::Vector3d &object,
@@ -47,6 +74,8 @@ bool TrajSE3Data::calcInitialVal() {
   backwardP(P, waypoints, D);
   backwardY(Y, Z);
 
+
+
   return true;
 }
 
@@ -62,13 +91,16 @@ bool TrajSE3Data::allocateSpace() {
   for (const auto &wp : waypoints) {
     spatialVarDim += wp.shape->dimension();
   }
-
+  std::cout << "total size: " << temporalVarDim + spatialVarDim + headingVarDim << std::endl;
   x.resize(temporalVarDim + spatialVarDim + headingVarDim);
   T.resize(totalPieces);
 
   P.resize(PATH_DIM, numPoints);
   Y.resize(numPoints);
   gradByTimes.resize(totalPieces);
+  gradByYawTimes.resize(totalPieces);
+  gradByXYZTimes.resize(totalPieces);
+
   gradByPoints.resize(PATH_DIM, numPoints);
   gradByYaw.resize(headingVarDim);
   partialGradByTimes.resize(totalPieces);
@@ -81,6 +113,8 @@ bool TrajSE3Data::allocateSpace() {
   Y.setZero();
   gradByPoints.setZero();
   gradByTimes.setZero();
+  gradByYawTimes.setZero();
+  gradByXYZTimes.setZero();
   gradByYaw.setZero();
   partialGradByTimes.setZero();
   partialGradByCoeffs.setZero();
@@ -152,6 +186,53 @@ void TrajSE3Data::forwardY(const Eigen::VectorXd &Z, Eigen::VectorXd &Y) {
   }
 }
 
+void TrajSE3Data::backPropagateT(const Eigen::VectorXd &K,
+                                  const Eigen::VectorXd &gradT,
+                                  Eigen::Map<Eigen::VectorXd> &gradK) {
+  for (int i = 0; i < K.size(); i++) {
+    if (K(i) > 0) {
+      gradK(i) = gradT(i) * (K(i) + 1.0);
+    } else {
+      const double denSqrt = (0.5 * K(i) - 1.0) * K(i) + 1.0;
+      gradK(i) = gradT(i) * (1.0 - K(i)) / (denSqrt * denSqrt);
+    }
+  }
+
+  return;
+}
+
+void TrajSE3Data::backPropagateP(const Eigen::VectorXd &D,
+                             const Eigen::Matrix3Xd &gradP,
+                             const std::deque<Waypoint> &waypoints,
+                             Eigen::Map<Eigen::VectorXd> &gradD) {
+  int k{0}, l{0};
+  int dim{0};
+  for (const auto &wp : waypoints) {
+    dim = wp.shape->dimension();
+    wp.shape->getGradD(D.segment(l, dim), gradP, k, l, gradD);
+    k++;
+    l += dim;
+  }
+  return;
+}
+
+
+void TrajSE3Data::backPropagateY(const Eigen::VectorXd &Z,
+                                  const Eigen::VectorXd &gradY,
+                                  Eigen::Map<Eigen::VectorXd> &gradZ) {
+  // calculate the gradient w.r.t. Z from the gradient w.r.t. Y
+  int k{0};
+  for (int i = 0; i < static_cast<int>(Z.size() / 2); i++) {
+    // Y(i) = std::atan2(Z(k + 1), Z(k));
+    const double den = Z(k) * Z(k) + Z(k + 1) * Z(k + 1);
+    gradZ(k) = gradY(i) * -Z(k + 1) / den;
+    gradZ(k+1) = gradY(i) * Z(k) / den;
+    k += 2;
+  }
+
+
+  return;
+}
 
 std::ostream& operator<<(std::ostream& os, const TrajSE3Data& data) {
   os.precision(4);

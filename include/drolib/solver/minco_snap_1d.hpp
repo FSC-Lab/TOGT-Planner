@@ -18,8 +18,8 @@ class MincoSnap1D {
 
  private:
   int N;
-  Eigen::Vector3d headPVAJ;
-  Eigen::Vector3d tailPVAJ;
+  Eigen::Matrix<double, 1, 4> headPVAJ;
+  Eigen::Matrix<double, 1, 4> tailPVAJ;
   BandedSystem A;
   Eigen::VectorXd b;
   Eigen::VectorXd T1;
@@ -31,8 +31,8 @@ class MincoSnap1D {
   Eigen::VectorXd T7;
 
  public:
-  void setConditions(const Eigen::Vector3d &headState,
-                     const Eigen::Vector3d &tailState,
+  void setConditions(const Eigen::Matrix<double, 1, 4> &headState,
+                     const Eigen::Matrix<double, 1, 4> &tailState,
                      const int &pieceNum) {
     N = pieceNum;
     headPVAJ = headState;
@@ -171,9 +171,9 @@ class MincoSnap1D {
 
   void getEnergyWithGrads(double &energy, Eigen::VectorXd &gdC,
                           Eigen::VectorXd &gdT) const {
-    // getEnergy(energy);
-    // getEnergyPartialGradByCoeffs(gdC);
-    // getEnergyPartialGradByTimes(gdT);
+    getEnergy(energy);
+    getEnergyPartialGradByCoeffs(gdC);
+    getEnergyPartialGradByTimes(gdT);
   }
 
   void getEnergy(double &energy) const {
@@ -242,8 +242,11 @@ void propagateGrad(const Eigen::VectorXd &partialGradByCoeffs,
                      const Eigen::VectorXd &partialGradByTimes,
                      Eigen::VectorXd &gradByPoints,
                      Eigen::VectorXd &gradByTimes) {
-    gradByPoints.resize(N - 1);
-    gradByTimes.resize(N);
+    // gradByPoints.resize(N - 1);
+    // gradByTimes.resize(N);
+    gradByPoints.setZero();
+    gradByTimes.setZero();                  
+
     Eigen::VectorXd adjGrad = partialGradByCoeffs;
     A.solveAdj(adjGrad);
 

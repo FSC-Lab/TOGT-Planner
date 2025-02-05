@@ -33,10 +33,16 @@ public:
   static void computeBeta(const double t,
                           Eigen::Ref<Eigen::Matrix<double, NUM_COEFF, 6>> beta);
 
-  bool solve(const PVAJ &initState, const PVAJ &endState,
-             const Eigen::Vector3d &initYaw, const Eigen::Vector3d &endYaw,
+  bool solve(const PVAJ3D &initState, const PVAJ3D &endState,
+             const Eigen::Matrix<double, 1, 4> &initYaw, const Eigen::Matrix<double, 1, 4> &endYaw,
              const QuadManifold &quad, const TrajParams &tparams,
              const LbfgsParams &lbfgs);
+
+  bool setInitialGuess(const TrajSE3Data &input_data) {
+    data = input_data;
+    return true;
+  }
+            
 
   // bool getTraejctory(PiecewisePolynomial<POLY_DEG> &trajectory) const {
   //   if (status == Status::LBFGS_FAILED) {
@@ -81,4 +87,4 @@ public:
 
 } // namespace drolib
 
-#endif /* DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_ */
+#endif  /* DROLIB_PLANNER_TRAJ_SE3_SOLVER_HPP_ */
