@@ -20,7 +20,7 @@ class QuadParams : public ParameterBase {
     T_mb = T_bm.inverse();
 
     q_bc = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-60, 0, -90)));
-    gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-90, 0, -90)));
+    gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(0, 90, 10)));
 
     std::cout << "q_bc: " << q_bc.coeffs().transpose() << std::endl;
     std::cout << "gate_orient: " << gate_orient.coeffs().transpose() << std::endl;

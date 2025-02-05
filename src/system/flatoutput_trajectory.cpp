@@ -47,7 +47,7 @@ TrajExtremum FlatoutputTrajectory::getSetpointVec(const double sampleTimeSecond)
     xyz_pvajs = traj_xyz.getPVAJS(t);
     yaw_pvaj = traj_yaw.getPVAJS(t);
     Eigen::Vector3d heading = yaw_pvaj.head<3>();
-    std::cout << "heading: " << heading.transpose() << std::endl;
+    // std::cout << "heading: " << heading.transpose() * 180.0 / M_PI << std::endl;
 
     Eigen::Vector3d pos = xyz_pvajs.col(0);
     length += (pos - last_pos).norm();
@@ -59,6 +59,8 @@ TrajExtremum FlatoutputTrajectory::getSetpointVec(const double sampleTimeSecond)
     extremum.tilt.add(setpoint.state.getTiltedAngle());
     extremum.omg.add(setpoint.input.omega);
     extremum.rpy.add(rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q())));
+    Eigen::Vector3d rpy = rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q()));
+    std::cout << "yaw: " << rpy.z() << std::endl;
 
     setpoints.push_back(setpoint);
 

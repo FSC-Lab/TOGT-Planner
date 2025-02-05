@@ -124,8 +124,7 @@ public:
                                const TrajParams &params,
                                Eigen::Ref<Eigen::Vector3d> gradOmg) const;
 
-  double addPerceptionCost(const Eigen::Quaterniond &quad_orient,
-                            const Eigen::Quaterniond &gate_orient,
+  double addPerceptionCost(const Eigen::Vector4d &quat,
                             const QuadParams &quad_params,
                             const TrajParams &params,
                             Eigen::Ref<Eigen::Vector4d> gradQuat) const;
@@ -254,15 +253,22 @@ private:
 
   inline casadi::SX rotate_quat(const casadi::SX& q, const casadi::SX& v) {
     // Extract scalar (w) and vector (vec) parts from the quaternion
-    casadi::SX w = q(0);                    // Scalar part
-    casadi::SX vec = q(casadi::Slice(1, 4)); // Vector part
+    // casadi::SX w = q(0);                    // Scalar part
+    // casadi::SX vec = q(casadi::Slice(1, 4)); // Vector part
 
-    // Compute uv = 2 * cross(vec, v)
-    casadi::SX uv = cross_SX(vec, v);  
-    uv = 2 * uv;
+    // // Compute uv = 2 * cross(vec, v)
+    // casadi::SX uv = cross_SX(vec, v);  
+    // uv = 2 * uv;
 
-    // Return the rotated vector
-    return v + w * uv + cross_SX(vec, uv);
+    // // Return the rotated vector
+    // return v + w * uv + cross_SX(vec, uv);
+
+    casadi::SX q_conj = casadi::SX::vertcat({q(0), -q(1), -q(2), -q(3)});
+    casadi::SX v_quat = casadi::SX::vertcat({0, v});
+    casadi::SX ans = quat_mult(quat_mult(q, v_quat), q_conj);
+    return casadi::SX::vertcat({ans(1), ans(2), ans(3)}); 
+
+
   }
 
   inline casadi::SX quat_mult(const casadi::SX& q1, const casadi::SX& q2) {
