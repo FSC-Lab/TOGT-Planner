@@ -118,6 +118,84 @@ bool TrajData::calcInitialVal() {
 
 bool TrajData::valid() const { return temporalVarDim > 0; }
 
+
+void TrajData::backwardT(const Eigen::VectorXd &T,
+                            Eigen::Map<Eigen::VectorXd> &K) {
+  for (int i = 0; i < T.size(); i++) {
+    K(i) = T(i) > 1.0 ? (sqrt(2.0 * T(i) - 1.0) - 1.0)
+                      : (1.0 - sqrt(2.0 / T(i) - 1.0));
+  }
+
+  return;
+}
+void TrajData::backwardP(const Eigen::Matrix3Xd &P,
+                            const std::deque<Waypoint> &waypoints,
+                            Eigen::Map<Eigen::VectorXd> &D) {
+  int k{0}, l{0};
+  int dim{0};
+  for (const auto &wp : waypoints) {
+    dim = wp.shape->dimension();
+    D.segment(l, dim) = wp.shape->toD(P.col(k));
+    k++;
+    l += dim;
+  }
+}
+
+
+void TrajData::forwardT(const Eigen::VectorXd &K, Eigen::VectorXd &T) {
+  for (int i = 0; i < K.size(); i++) {
+    T(i) = K(i) > 0.0 ? ((0.5 * K(i) + 1.0) * K(i) + 1.0)
+                      : 1.0 / ((0.5 * K(i) - 1.0) * K(i) + 1.0);
+    // T(i) = K(i) * K(i);
+  }
+  return;
+}
+
+void TrajData::forwardP(const Eigen::VectorXd &D,
+                            const std::deque<Waypoint> &waypoints,
+                            Eigen::Matrix3Xd &P) {
+  int k{0}, l{0};
+  int dim{0};
+  for (const auto &wp :waypoints) {
+    dim = wp.shape->dimension();
+    P.col(k) = wp.shape->toP(D.segment(l, dim));
+    k++;
+    l += dim;
+  }
+  return;
+}
+
+
+void TrajData::backPropagateT(const Eigen::VectorXd &K,
+                                  const Eigen::VectorXd &gradT,
+                                  Eigen::Map<Eigen::VectorXd> &gradK) {
+  for (int i = 0; i < K.size(); i++) {
+    if (K(i) > 0) {
+      gradK(i) = gradT(i) * (K(i) + 1.0);
+    } else {
+      const double denSqrt = (0.5 * K(i) - 1.0) * K(i) + 1.0;
+      gradK(i) = gradT(i) * (1.0 - K(i)) / (denSqrt * denSqrt);
+    }
+  }
+
+  return;
+}
+
+void TrajData::backPropagateP(const Eigen::VectorXd &D,
+                             const Eigen::Matrix3Xd &gradP,
+                             const std::deque<Waypoint> &waypoints,
+                             Eigen::Map<Eigen::VectorXd> &gradD) {
+  int k{0}, l{0};
+  int dim{0};
+  for (const auto &wp : waypoints) {
+    dim = wp.shape->dimension();
+    wp.shape->getGradD(D.segment(l, dim), gradP, k, l, gradD);
+    k++;
+    l += dim;
+  }
+  return;
+}
+
 std::ostream& operator<<(std::ostream& os, const TrajData& data) {
   os.precision(4);
   // os << std::scientific;

@@ -2,10 +2,10 @@
 
 namespace drolib {
 
-bool TrajSE3Solver::solve(const PVAJ &initState,
-            const PVAJ &endState, 
-            const Eigen::Vector3d &initYaw,
-            const Eigen::Vector3d &endYaw,
+bool TrajSE3Solver::solve(const PVAJ3D &initState,
+            const PVAJ3D &endState, 
+            const PVAJ1D &initYaw,
+            const PVAJ1D &endYaw,
             const QuadManifold &quad,
             const TrajParams &tparams,
             const LbfgsParams& lbfgs) {
@@ -13,17 +13,20 @@ bool TrajSE3Solver::solve(const PVAJ &initState,
   //   std::cout << "Data is not initialized properly.\n";
   //   return false;
   // }
-
   this->quad = quad; 
   this->tparams = tparams; 
 
   minco.setConditions(initState, endState, data.totalPieces);
   minco_yaw.setConditions(initYaw, endYaw, data.totalPieces);
 
+  // minco_yaw.setParameters(data.Y, data.T);
+  // std::cout << "coeffs: " << minco_yaw.getCoeffs() << std::endl;
+  // std::cout << "initYaw: " << initYaw << std::endl;
+  // std::cout << "endYaw: " << endYaw << std::endl;
+
   double cost{0.0};
   int ret = lbfgs_optimize(data.x, cost, &TrajSE3Solver::costFunction, nullptr, nullptr, this, lbfgs.params);
 
-  // std::cout << "minimum cost: " << cost << "\n";
   if (ret < 0) {
     status = Status::LBFGS_FAILED;
     return false;
@@ -42,7 +45,8 @@ bool TrajSE3Solver::solve(const PVAJ &initState,
 
 
   status = static_cast<Status>(ret);
-  // minco.getTrajectory(data.traj);
+  minco.getTrajectory(data.traj_xyz);
+  minco_yaw.getTrajectory(data.traj_yaw);
 
 
   return true;
@@ -50,23 +54,28 @@ bool TrajSE3Solver::solve(const PVAJ &initState,
 
 double TrajSE3Solver::costFunction(void *ptr, const Eigen::VectorXd &x,
                                   Eigen::VectorXd &g) {
+  // std::cout << "---------------------------" << std::endl;
   TrajSE3Solver *obj = reinterpret_cast<TrajSE3Solver *>(ptr);
   const int dimK = obj->data.temporalVarDim;
   const int dimD = obj->data.spatialVarDim;
   const int dimY = obj->data.headingVarDim;
-
   // Obtain current variables with gradients
   Eigen::Map<const Eigen::VectorXd> K(x.data(), dimK);
   Eigen::Map<const Eigen::VectorXd> D(x.data() + dimK, dimD);
   Eigen::Map<const Eigen::VectorXd> Z(x.data() + dimK + dimD, dimY);
+  // std::cout << "Z: " << Z.transpose() << std::endl;
 
   Eigen::Map<Eigen::VectorXd> gradK(g.data(), dimK);
   Eigen::Map<Eigen::VectorXd> gradD(g.data() + dimK, dimD);
-  Eigen::Map<Eigen::VectorXd> gradY(g.data() + dimK + dimD, dimY);
+  Eigen::Map<Eigen::VectorXd> gradZ(g.data() + dimK + dimD, dimY);
 
   TrajSE3Data::forwardT(K, obj->data.T);
   TrajSE3Data::forwardP(D, obj->data.waypoints, obj->data.P);
   TrajSE3Data::forwardY(Z, obj->data.Y);
+  // std::cout << "Y: " << obj->data.Y.transpose() << std::endl;
+  std::cout << "x: " << x.transpose() << std::endl;
+  std::cout << "Z: " << Z.transpose() << std::endl;
+  std::cout << "Y: " << obj->data.Y.transpose() * 180.0 / M_PI << std::endl;
 
   double cost{0.0};
   obj->data.partialGradByTimes.setZero();
@@ -76,15 +85,27 @@ double TrajSE3Solver::costFunction(void *ptr, const Eigen::VectorXd &x,
   obj->minco.setParameters(obj->data.P, obj->data.T);
   obj->minco_yaw.setParameters(obj->data.Y, obj->data.T);
 
-  cost += addEnergyCost(obj->minco, obj->minco_yaw, obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
+
+  // cost += addEnergyCost(obj->minco, obj->minco_yaw, obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
   cost += addPenaltyCost(obj->data.T, obj->minco.getCoeffs(), obj->minco_yaw.getCoeffs(), obj->quad, obj->yawTilt.get(), obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
+  std::cout << "obj->data.partialGradByHeadingCoeffs: " << obj->data.partialGradByHeadingCoeffs.norm() << std::endl;
+  obj->minco.propagateGrad(obj->data.partialGradByCoeffs, obj->data.partialGradByTimes, obj->data.gradByPoints, obj->data.gradByXYZTimes);
+  obj->minco_yaw.propagateGrad(obj->data.partialGradByHeadingCoeffs, obj->data.partialGradByTimes, obj->data.gradByYaw, obj->data.gradByYawTimes);
+  
+  std::cout << "gradByYaw: " << obj->data.gradByYaw.norm() << std::endl;
+  std::cout << "gradByYawTimes: " << obj->data.gradByYawTimes.norm() << std::endl;
+  // obj->data.gradByYawTimes.setZero();
+  obj->data.gradByTimes = obj->data.gradByYawTimes + obj->data.gradByXYZTimes;
 
-  // obj->minco.propagateGrad(obj->data.partialGradByCoeffs, obj->data.partialGradByTimes, obj->data.gradByPoints, obj->data.gradByTimes);
+  cost += addTimeCost(obj->data.T, obj->tparams, obj->data.gradByTimes);
 
-  // cost += addTimeCost(obj->data.T, obj->tparams, obj->data.gradByTimes);
+  TrajSE3Data::backPropagateT(K, obj->data.gradByTimes, gradK);
+  TrajSE3Data::backPropagateP(D, obj->data.gradByPoints, obj->data.waypoints, gradD);
+  TrajSE3Data::backPropagateY(Z, obj->data.gradByYaw, gradZ);
 
-  // backPropagateT(K, obj->data.gradByTimes, gradK);
-  // backPropagateP(D, obj->data.gradByPoints, obj->data.waypoints, gradD);
+  // std::cout << "gradZ: " << gradZ.transpose() << std::endl;
+  std::cout << "gradZ: " << gradZ.norm() << std::endl;
+
 
   return cost;
 }
@@ -136,7 +157,7 @@ double TrajSE3Solver::addPenaltyCost(const Eigen::VectorXd &T,
   Eigen::Vector3d pos, vel, acc, jer, sna, cra;
   double yaw, yawrate, yawacc, yawjer;
   Eigen::Vector3d heading;
-  PVAJS pvajs;
+  PVAJS3D pvajs;
   Setpoint setpoint;
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
@@ -153,11 +174,14 @@ double TrajSE3Solver::addPenaltyCost(const Eigen::VectorXd &T,
 
   for (int i = 0; i < pieceNum; i++) {
     const Eigen::Matrix<double, NUM_COEFF, PATH_DIM> &path_c = path_coeffs.block<NUM_COEFF, PATH_DIM>(i * NUM_COEFF, 0);
-    const Eigen::Matrix<double, NUM_COEFF, YAW_DIM> &heading_c = heading_coeffs.segment<NUM_COEFF>(i * NUM_COEFF);
+    Eigen::Matrix<double, NUM_COEFF, YAW_DIM> heading_c = heading_coeffs.segment<NUM_COEFF>(i * NUM_COEFF);
+    // heading_c.setZero();
 
     const double integralFrac = 1.0f / numCheckPerPiece;
     step = T(i) * integralFrac;
     for (int j = 0; j <= numCheckPerPiece; j++) {
+      // std::cout << "==============dt: " <<  j * step << std::endl;
+
       computeBeta(j * step, beta);
       pos = path_c.transpose() * beta.col(0);
       vel = path_c.transpose() * beta.col(1);
@@ -175,13 +199,19 @@ double TrajSE3Solver::addPenaltyCost(const Eigen::VectorXd &T,
       yawjer = (heading_coeffs.transpose() * beta.col(3));
        
       heading << yaw, yawrate, yawacc;
+      // heading.setZero();
+      // std::cout << "heading_coeffs: " << heading_coeffs << std::endl;
+      std::cout << "heading: " << heading.transpose() << std::endl;
 
       pvajs << pos, vel, acc, jer, sna;
       penalty = 0.0;
 
       /***********************************************/
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
-      penalty += quad.computePenalityCost(pvajs, heading, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // penalty += quad.computePenalityCost(pvajs, heading, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      penalty += quad.computePenalityCostAD(pvajs, heading, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // std::cout << "totalGradHeading: " << totalGradHeading << std::endl;
+      // totalGradHeading.setZero();
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
@@ -202,11 +232,15 @@ double TrajSE3Solver::addPenaltyCost(const Eigen::VectorXd &T,
       gradHeadingC.block<NUM_COEFF, YAW_DIM>(i * NUM_COEFF, 0) +=
           (beta.col(0) * totalGradHeading(0) +
            beta.col(1) * totalGradHeading(1) +
-            beta.col(2) * totalGradHeading(2)) * step * node;    
+            beta.col(2) * totalGradHeading(2)) * step * node;
 
+      std::cout << "gradHeadingC: " << gradHeadingC.norm() << std::endl;
       gradT(i) += (totalGradPos.dot(vel) + totalGradVel.dot(acc) +
                     totalGradAcc.dot(jer) + totalGradJer.dot(sna) +
-                    totalGradSna.dot(cra) + totalGradHeading(0) * yawrate + totalGradHeading(1) * yawacc + totalGradHeading(2) * yawjer) * step * node * alpha + node * integralFrac * penalty;
+                    totalGradSna.dot(cra) 
+                    + totalGradHeading(0) * yawrate 
+                    + totalGradHeading(1) * yawacc
+                    + totalGradHeading(2) * yawjer) * step * node * alpha + node * integralFrac * penalty;
 
       cost += node * step * penalty;
     }

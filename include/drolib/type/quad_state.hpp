@@ -71,7 +71,7 @@ class QuadState : public ParameterBase {
   
   inline bool valid() const override { return x.allFinite() && std::isfinite(t); }
 
-  inline PVAJ toPVAJ() const {
+  inline PVAJ3D toPVAJ() const {
     return (Eigen::Matrix<double, 3, 4>() << p, v, a, j).finished();
   }
 

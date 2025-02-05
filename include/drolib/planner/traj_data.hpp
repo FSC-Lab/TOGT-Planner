@@ -63,7 +63,29 @@ struct TrajData {
   Eigen::MatrixX3d partialGradByCoeffs;
   Eigen::VectorXd partialGradByTimes;
 
-  PiecewisePolynomial<POLY_DEG> traj;
+  PiecewisePolynomial<POLY_DEG, 3> traj;
+
+  static void backwardT(const Eigen::VectorXd &T,
+                        Eigen::Map<Eigen::VectorXd> &K);
+
+  static void backwardP(const Eigen::Matrix3Xd &P,
+                        const std::deque<Waypoint> &waypoints,
+                        Eigen::Map<Eigen::VectorXd> &D);
+
+  static void forwardT(const Eigen::VectorXd &K, Eigen::VectorXd &T);
+
+  static void forwardP(const Eigen::VectorXd &D,
+                       const std::deque<Waypoint> &waypoints,
+                       Eigen::Matrix3Xd &P);
+  static void backPropagateT(const Eigen::VectorXd &K,
+                             const Eigen::VectorXd &gradT,
+                             Eigen::Map<Eigen::VectorXd> &gradK);
+
+  static void backPropagateP(const Eigen::VectorXd &D,
+                             const Eigen::Matrix3Xd &gradP,
+                             const std::deque<Waypoint> &waypoints,
+                             Eigen::Map<Eigen::VectorXd> &gradD);
+
 };
 
 }  // namespace drolib

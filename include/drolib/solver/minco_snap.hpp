@@ -263,7 +263,7 @@ class MincoSnap {
     return;
   }
 
-  void getTrajectory(PiecewisePolynomial<7> &polys) const {
+  void getTrajectory(PiecewisePolynomial<7, 3> &polys) const {
     polys.clear();
     for (int i = 0; i < N; i++) {
       polys.emplace_back(
@@ -343,6 +343,8 @@ class MincoSnap {
                      const Eigen::VectorXd &partialGradByTimes,
                      Eigen::Matrix3Xd &gradByPoints,
                      Eigen::VectorXd &gradByTimes) {
+    gradByPoints.setZero();
+    gradByTimes.setZero();                  
     // gradByPoints.resize(3, N - 1);
     // gradByTimes.resize(N);
     Eigen::MatrixX3d adjGrad = partialGradByCoeffs;

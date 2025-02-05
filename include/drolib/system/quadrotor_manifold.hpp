@@ -22,14 +22,14 @@ public:
   QuadManifold(const QuadParams params);
   ~QuadManifold();
 
-  bool toStateWithTiltYaw(const double t, const PVAJS &input,
+  bool toStateWithTiltYaw(const double t, const PVAJS3D &input,
                           const Eigen::Vector3d &yaw, Setpoint &output) const;
 
-  bool toStateWithTiltYawMass(const double t, const PVAJS &input,
+  bool toStateWithTiltYawMass(const double t, const PVAJS3D &input,
                               const Eigen::Vector3d &yaw,
                               Setpoint &output) const;
 
-  bool toStateWithTiltYawAD(const double t, const PVAJS &input,
+  bool toStateWithTiltYawAD(const double t, const PVAJS3D &input,
                             const Eigen::Vector3d &heading, Setpoint &output,
                             Eigen::Matrix<double, 11, 3> &jacVel,
                             Eigen::Matrix<double, 11, 3> &jacAcc,
@@ -39,10 +39,10 @@ public:
 
   mutable Eigen::Quaterniond q_tilt_last_{1, 0, 0, 0};
 
-  bool toStateWithTrueYaw(const double t, const PVAJS &input,
+  bool toStateWithTrueYaw(const double t, const PVAJS3D &input,
                           const Eigen::Vector3d &yaw, Setpoint &output) const;
 
-  bool computeThrustBodyrates(const PVAJS &input, const Eigen::Vector3d &yaw,
+  bool computeThrustBodyrates(const PVAJS3D &input, const Eigen::Vector3d &yaw,
                               double &thrust, double &bodyrateXY,
                               double &bodyrateZ) const;
 
@@ -60,7 +60,7 @@ public:
                            Eigen::Vector3d &gradTotalJer) const;
 
   /****************************************************/
-  double computePenalityCost(const PVAJS &pvajs, const Eigen::Vector3d &yaw,
+  double computePenalityCost(const PVAJS3D &pvajs, const Eigen::Vector3d &yaw,
                              const TrajParams &params,
                              Eigen::Vector3d &gradTotalPos,
                              Eigen::Vector3d &gradTotalVel,
@@ -69,32 +69,42 @@ public:
                              Eigen::Vector3d &gradTotalSna,
                              Eigen::Vector3d &gradTotalHeading) const;
 
+  double computePenalityCostAD(const PVAJS3D &pvajs, const Eigen::Vector3d &yaw,
+                             const TrajParams &params,
+                             Eigen::Vector3d &gradTotalPos,
+                             Eigen::Vector3d &gradTotalVel,
+                             Eigen::Vector3d &gradTotalAcc,
+                             Eigen::Vector3d &gradTotalJer,
+                             Eigen::Vector3d &gradTotalSna,
+                             Eigen::Vector3d &gradTotalHeading) const;
+
+
   double computeSimplePenalityCost(
-      const PVAJS &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+      const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
       Eigen::Vector3d &gradTotalSna) const;
 
   //   double computeFastRacingPenalityCost(
-  //       const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams
+  //       const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams
   //       &params, Eigen::Vector3d &gradTotalPos, Eigen::Vector3d
   //       &gradTotalVel, Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d
   //       &gradTotalJer, Eigen::Vector3d &gradTotalSna) const;
 
-  double computePenalityCostAD(
-      const PVAJS &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
-      Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
-      Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
-      Eigen::Vector3d &gradTotalSna, Eigen::Vector3d &gradToHeading) const;
+//   double computePenalityCostAD(
+//       const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+//       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
+//       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
+//       Eigen::Vector3d &gradTotalSna, Eigen::Vector3d &gradToHeading) const;
 
   double computeRobustPenalityCost(
-      const PVAJS &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+      const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
       Eigen::Vector3d &gradTotalSna) const;
 
   double computeRobustSimplePenalityCost(
-      const PVAJS &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+      const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
       Eigen::Vector3d &gradTotalSna) const;
@@ -117,6 +127,10 @@ public:
   double addPerceptionCost(const Eigen::Quaterniond &quad_orient,
                             const Eigen::Quaterniond &gate_orient,
                             const QuadParams &quad_params,
+                            const TrajParams &params,
+                            Eigen::Ref<Eigen::Vector4d> gradQuat) const;
+
+  double addYawPenality(const Eigen::Vector4d &quat,
                             const TrajParams &params,
                             Eigen::Ref<Eigen::Vector4d> gradQuat) const;
 

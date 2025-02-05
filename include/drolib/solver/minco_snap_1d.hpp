@@ -18,8 +18,8 @@ class MincoSnap1D {
 
  private:
   int N;
-  Eigen::Vector3d headPVAJ;
-  Eigen::Vector3d tailPVAJ;
+  Eigen::Matrix<double, 1, 4> headPVAJ;
+  Eigen::Matrix<double, 1, 4> tailPVAJ;
   BandedSystem A;
   Eigen::VectorXd b;
   Eigen::VectorXd T1;
@@ -31,8 +31,8 @@ class MincoSnap1D {
   Eigen::VectorXd T7;
 
  public:
-  void setConditions(const Eigen::Vector3d &headState,
-                     const Eigen::Vector3d &tailState,
+  void setConditions(const Eigen::Matrix<double, 1, 4> &headState,
+                     const Eigen::Matrix<double, 1, 4> &tailState,
                      const int &pieceNum) {
     N = pieceNum;
     headPVAJ = headState;
@@ -169,11 +169,20 @@ class MincoSnap1D {
     return;
   }
 
+  void getTrajectory(PiecewisePolynomial<7, 1> &polys) const {
+    polys.clear();
+    for (int i = 0; i < N; i++) {
+      polys.emplace_back(
+          T1(i), b.block<8, 1>(8 * i, 0).transpose().rowwise().reverse());
+    }
+    return;
+  }
+
   void getEnergyWithGrads(double &energy, Eigen::VectorXd &gdC,
                           Eigen::VectorXd &gdT) const {
-    // getEnergy(energy);
-    // getEnergyPartialGradByCoeffs(gdC);
-    // getEnergyPartialGradByTimes(gdT);
+    getEnergy(energy);
+    getEnergyPartialGradByCoeffs(gdC);
+    getEnergyPartialGradByTimes(gdT);
   }
 
   void getEnergy(double &energy) const {
@@ -242,8 +251,11 @@ void propagateGrad(const Eigen::VectorXd &partialGradByCoeffs,
                      const Eigen::VectorXd &partialGradByTimes,
                      Eigen::VectorXd &gradByPoints,
                      Eigen::VectorXd &gradByTimes) {
-    gradByPoints.resize(N - 1);
-    gradByTimes.resize(N);
+    // gradByPoints.resize(N - 1);
+    // gradByTimes.resize(N);
+    gradByPoints.setZero();
+    gradByTimes.setZero();                  
+
     Eigen::VectorXd adjGrad = partialGradByCoeffs;
     A.solveAdj(adjGrad);
 
@@ -323,7 +335,7 @@ void propagateGrad(const Eigen::VectorXd &partialGradByCoeffs,
 
     gradByTimes(N - 1) =
         B2.cwiseProduct(adjGrad.segment<4>(8 * N - 4)).sum();
-    gradByTimes += partialGradByTimes;
+    // gradByTimes += partialGradByTimes;
   }
 };
 

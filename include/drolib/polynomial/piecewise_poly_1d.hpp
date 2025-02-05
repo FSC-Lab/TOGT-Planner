@@ -1,0 +1,8 @@
+#ifndef DROLIB_POLYNOMIAL_PIECEWISE_POLY_1D_HPP_
+#define DROLIB_POLYNOMIAL_PIECEWISE_POLY_1D_HPP_
+
+#include "drolib/polynomial/polynomial_1d.hpp"
+
+
+
+#endif  /* DROLIB_POLYNOMIAL_PIECEWISE_POLY_1D_HPP_ */

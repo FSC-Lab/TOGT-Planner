@@ -5,8 +5,11 @@
 
 namespace drolib {
 
-using PVAJ = Eigen::Matrix<double, 3, 4>;
-using PVAJS = Eigen::Matrix<double, 3, 5>;
+using PVAJ3D = Eigen::Matrix<double, 3, 4>;
+using PVAJS3D = Eigen::Matrix<double, 3, 5>;
+
+using PVAJ1D = Eigen::Matrix<double, 1, 4>;
+using PVAJS1D = Eigen::Matrix<double, 1, 5>;
 
 static constexpr int PATH_DIM = 3;
 static constexpr int YAW_DIM = 1;

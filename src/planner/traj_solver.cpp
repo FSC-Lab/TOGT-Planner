@@ -10,8 +10,8 @@ bool TrajSolver::setInitialGuess(const TrajData &tdata) {
   return true;
 }
 
-bool TrajSolver::solve(const PVAJ &initState,
-            const PVAJ &endState, 
+bool TrajSolver::solve(const PVAJ3D &initState,
+            const PVAJ3D &endState, 
             const QuadManifold &quad,
             const TrajParams &tparams,
             const LbfgsParams& lbfgs) {
@@ -61,8 +61,8 @@ bool TrajSolver::solve(const PVAJ &initState,
 
   // std::cout << "minco.b solved:\n" << minco.b << std::endl;
 
-  Eigen::FullPivLU<Eigen::MatrixXd> lu(minco.A_eigen);
-  Eigen::MatrixXd x = lu.solve(minco.b_eigen);
+  // Eigen::FullPivLU<Eigen::MatrixXd> lu(minco.A_eigen);
+  // Eigen::MatrixXd x = lu.solve(minco.b_eigen);
   // std::cout << "Eigen solved x:\n" << x << std::endl;
 
   return true;
@@ -137,7 +137,7 @@ double TrajSolver::addRobustPenaltyCost(const Eigen::VectorXd &T,
   Eigen::Matrix<double, NUM_COEFF, 6> beta;
   Eigen::Vector3d pos, vel, acc, jer, sna, cra;
   Eigen::Vector3d yaw;
-  PVAJS pvajs;
+  PVAJS3D pvajs;
   Setpoint setpoint;
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
@@ -232,7 +232,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
   Eigen::Matrix<double, NUM_COEFF, 6> beta;
   Eigen::Vector3d pos, vel, acc, jer, sna, cra;
   Eigen::Vector3d yaw;
-  PVAJS pvajs;
+  PVAJS3D pvajs;
   Setpoint setpoint;
 
   Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
@@ -277,7 +277,8 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
 
       /***********************************************/
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
-      penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/

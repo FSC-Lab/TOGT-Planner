@@ -79,7 +79,7 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
   // segments.clear();
   assignWaypoints(cur);
 
-  PiecewisePolynomial<POLY_DEG> segment;
+  PiecewisePolynomial<POLY_DEG, 3> segment;
   int segmentIdx{0};
   int pointIdx{0}, timeIdx{0};
   for (size_t i{0}; i < corridors.size(); ++i) {
@@ -131,6 +131,37 @@ bool RaceTrack::getData(const double speedGuess, TrajData &tdata) {
   assignWaypoints(tdata);
   tdata.initData(initState.p, endState.p, speedGuess);
   return true;
+}
+
+bool RaceTrack::getSE3Data(const double speedGuess, const double initYaw, TrajSE3Data &se3_data) {
+  assignWaypointsSE3(se3_data);
+  // std::cout << "assignWaypoints" << std::endl;
+
+  se3_data.initDataWithDesiredYaw(initState.p, endState.p, initYaw, speedGuess);
+  // std::cout << "initDataWithDesiredYaw" << std::endl;
+  return true;
+
+}
+
+void RaceTrack::assignWaypointsSE3(TrajSE3Data &se3_data) {
+  int idx{0};
+  se3_data.clear();
+  for (size_t i{0}; i < corridors.size(); ++i) {
+    se3_data.append(corridors[i]->corridor);
+
+    segments.emplace_back(idx, corridors[i]->size() + 1);
+    idx += corridors[i]->size() + 1;
+
+    if (i < gates.size()) {
+      se3_data.append(gates[i]->corridor);
+
+      if (gates[i]->size() >= 2) {
+        segments.emplace_back(idx, gates[i]->size() - 1);
+        idx += gates[i]->size() - 1;
+      }
+    }
+  }
+  se3_data.allocateSpace();
 }
 
 void RaceTrack::assignWaypoints(TrajData &tdata) {

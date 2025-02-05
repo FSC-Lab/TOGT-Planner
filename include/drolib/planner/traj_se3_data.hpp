@@ -18,6 +18,11 @@ struct TrajSE3Data {
 
   bool allocateSpace();
 
+  bool initDataWithDesiredYaw(const Eigen::Vector3d &startPos,
+                           const Eigen::Vector3d &endPos,
+                           const double desiredyaw,
+                           const double speedGuess = 1.0);
+
   bool initData(const Eigen::Vector3d &startPos, const Eigen::Vector3d &endPos,
                 const Eigen::Vector3d &object, const double speedGuess = 1.0);
 
@@ -43,6 +48,19 @@ struct TrajSE3Data {
                        Eigen::Matrix3Xd &P);
 
   static void forwardY(const Eigen::VectorXd &Z, Eigen::VectorXd &Y);
+
+  static void backPropagateT(const Eigen::VectorXd &K,
+                             const Eigen::VectorXd &gradT,
+                             Eigen::Map<Eigen::VectorXd> &gradK);
+
+  static void backPropagateP(const Eigen::VectorXd &D,
+                             const Eigen::Matrix3Xd &gradP,
+                             const std::deque<Waypoint> &waypoints,
+                             Eigen::Map<Eigen::VectorXd> &gradD);
+
+  static void backPropagateY(const Eigen::VectorXd &Z,
+                             const Eigen::VectorXd &gradY,
+                             Eigen::Map<Eigen::VectorXd> &gradZ);                                           
 
   inline int getNumPoints() const { return waypoints.size(); }
 
@@ -72,11 +90,18 @@ struct TrajSE3Data {
   Eigen::VectorXd Y;
 
   Eigen::VectorXd gradByTimes;
+  Eigen::VectorXd gradByYawTimes;
+  Eigen::VectorXd gradByXYZTimes;
+
   Eigen::Matrix3Xd gradByPoints;
   Eigen::VectorXd gradByYaw;
   Eigen::VectorXd partialGradByTimes;
   Eigen::MatrixX3d partialGradByCoeffs;
   Eigen::VectorXd partialGradByHeadingCoeffs;
+
+  PiecewisePolynomial<7, 3> traj_xyz;
+  PiecewisePolynomial<7, 1> traj_yaw;
+
 };
 
 } // namespace drolib

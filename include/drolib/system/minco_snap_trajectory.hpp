@@ -125,9 +125,9 @@ struct MincoSnapTrajectory {
   std::string name;
   std::string quad_name;
   QuadManifold quad;
-  PiecewisePolynomial<POLY_DEG> polys;
-  PVAJ start_pvaj;
-  PVAJ end_pvaj;
+  PiecewisePolynomial<POLY_DEG, 3> polys;
+  PVAJ3D start_pvaj;
+  PVAJ3D end_pvaj;
   Eigen::Matrix3Xd waypoints;
   Eigen::VectorXd durations;
   double start_yaw{0.0};
@@ -142,6 +142,9 @@ struct MincoSnapTrajectory {
   spline::CubicSpline length_to_time_;
 
   Eigen::Quaterniond prev_quat{Eigen::Quaterniond::Identity()};
+
+  double horizon{5.0};
+
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);
 };

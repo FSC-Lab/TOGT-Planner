@@ -25,11 +25,11 @@ QuadManifold::QuadManifold(const QuadParams params) : quad_params_(params) {
 
 QuadManifold::~QuadManifold() {}
 
-bool QuadManifold::computeThrustBodyrates(const PVAJS &input, const Eigen::Vector3d& yaw, double& thrust, double& bodyrateXY, double& bodyrateZ) const {
+bool QuadManifold::computeThrustBodyrates(const PVAJS3D &input, const Eigen::Vector3d& yaw, double& thrust, double& bodyrateXY, double& bodyrateZ) const {
   return true;
 }
 
-bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS3D &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
   output.state.t = t;
   output.input.t = t;
 
@@ -82,7 +82,7 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS &input, const 
 }
 /****************************************************/
 double QuadManifold::computePenalityCost(
-    const PVAJS &pvajs, const Eigen::Vector3d& heading, const TrajParams &params,
+    const PVAJS3D &pvajs, const Eigen::Vector3d& heading, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna,
@@ -103,11 +103,11 @@ double QuadManifold::computePenalityCost(
 
   Setpoint setpoint;
   toStateWithTiltYawMass(0.0, pvajs, heading, setpoint);
-  cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
-  cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
+  // cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
+  // cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
   cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
   cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-  cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+  // cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
 
   backPropagate(gradPos, gradVel, gradQuat, gradOmg,
                           gradThrusts, gradTotalPos, gradTotalVel,
@@ -230,8 +230,81 @@ double QuadManifold::computePenalityCost(
 
 }
 
+double QuadManifold::computePenalityCostAD(
+    const PVAJS3D &pvajs, const Eigen::Vector3d& heading, const TrajParams &params,
+    Eigen::Vector3d &gradTotalPos,
+    Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
+    Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna,
+    Eigen::Vector3d &gradTotalHeading) const {
+  double cost{0.0};
+  Eigen::Vector3d gradPos{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradVel{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradOmg{Eigen::Vector3d::Zero()};
+  Eigen::Vector4d gradQuat{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d gradThrusts{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d gradPerceptionQuat{Eigen::Vector4d::Zero()};
+  gradTotalPos.setZero();
+  gradTotalVel.setZero();
+  gradTotalAcc.setZero();
+  gradTotalJer.setZero();
+  gradTotalSna.setZero();
+  gradTotalHeading.setZero();
+
+  /****************************AD */
+  Setpoint setpoint_ad;
+
+  Eigen::Matrix<double, 11, 3> jacVel;
+  Eigen::Matrix<double, 11, 3> jacAcc;
+  Eigen::Matrix<double, 11, 3> jacJer;
+  Eigen::Matrix<double, 11, 3> jacSna;
+  Eigen::Matrix<double, 11, 3> jacHeading;
+  toStateWithTiltYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
+
+  cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
+  cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
+  cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
+  // cost += addYawPenality(setpoint_ad.state.qx, params, gradPerceptionQuat);
+
+  gradTotalAcc =
+        (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
+        +
+        (gradOmg.transpose() * jacAcc.middleRows(4, 3)).transpose() // omg penalty
+        + gradThrusts(0) * jacAcc.row(7).transpose()   // thrust 1 penalty
+        + gradThrusts(1) * jacAcc.row(8).transpose()   // thrust 2 penalty
+        + gradThrusts(2) * jacAcc.row(9).transpose()   // thrust 3 penalty
+        + gradThrusts(3) * jacAcc.row(10).transpose()  // thrust 4 penalty
+        + (gradPerceptionQuat.transpose() * jacAcc.topRows(4)).transpose(); // perception cost
+
+
+  gradTotalJer =
+      (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose() // omg penalty
+      + gradThrusts(0) * jacJer.row(7).transpose()   // thrust 1 penalty
+      + gradThrusts(1) * jacJer.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacJer.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacJer.row(10).transpose(); // thrust 4 penalty
+
+  gradTotalSna =
+      gradThrusts(0) * jacSna.row(7).transpose()     // thrust 1 penalty
+      + gradThrusts(1) * jacSna.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacSna.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacSna.row(10).transpose(); // thrust 4 penalty
+
+  gradTotalHeading = 
+      (gradQuat.transpose() * jacHeading.topRows(4)).transpose() // quat penalty
+      +
+      (gradOmg.transpose() * jacHeading.middleRows(4, 3)).transpose() // omg penalty
+      + gradThrusts(0) * jacHeading.row(7).transpose() // thrust 1 penalty
+      + gradThrusts(1) * jacHeading.row(8).transpose()   // thrust 2 penalty
+      + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
+      + gradThrusts(3) * jacHeading.row(10).transpose() // thrust 4 penalty
+      + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose(); // perception cost
+  /**************************** */
+  return cost;
+
+}
+
 double QuadManifold::computeSimplePenalityCost(
-    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+    const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
@@ -258,7 +331,7 @@ double QuadManifold::computeSimplePenalityCost(
 }
 
 // double QuadManifold::computeFastRacingPenalityCost(
-//     const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+//     const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
 //     Eigen::Vector3d &gradTotalPos,
 //     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
 //     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
@@ -266,7 +339,7 @@ double QuadManifold::computeSimplePenalityCost(
 // }
 
 double QuadManifold::computeRobustSimplePenalityCost(
-    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+    const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
@@ -492,25 +565,8 @@ double QuadManifold::computeRobustSimplePenalityCost(
   return cost;
 }
 
-// TODO(chao): implement this function
-double QuadManifold::computePenalityCostAD(
-    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
-    Eigen::Vector3d &gradTotalPos,
-    Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
-    Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna,
-    Eigen::Vector3d &gradToHeading) const {
-  double omg_xy_sqr{0.0}, omg_z_sqr{0.0}, thrust{0.0};
-  Eigen::Vector3d pos = pvajs.col(0);
-  Eigen::Vector3d vel = pvajs.col(1);  
-  Eigen::Vector3d acc = pvajs.col(2);
-  Eigen::Vector3d jer = pvajs.col(3);
-  Eigen::Vector3d sna = pvajs.col(4);
-
-  return true; 
-}
-
 double QuadManifold::computeRobustPenalityCost(
-    const PVAJS &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
+    const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
     Eigen::Vector3d &gradTotalVel, Eigen::Vector3d &gradTotalAcc,
     Eigen::Vector3d &gradTotalJer, Eigen::Vector3d &gradTotalSna) const {
@@ -818,6 +874,33 @@ double QuadManifold::addBodyratePenalities(const Eigen::Vector3d &omg,
   return penalty;
 }
 
+double QuadManifold::addYawPenality(const Eigen::Vector4d &quat,
+                            const TrajParams &params,
+                            Eigen::Ref<Eigen::Vector4d> gradQuat) const {
+  double penalty{0.0};
+  gradQuat.setZero();
+  const double weightYaw = 0.001;
+  const double desiredyaw = M_PI / 6;
+  const Eigen::Quaterniond q_yaw = eulerAnglesRPYToQuaternion(Eigen::Vector3d(0, 0, desiredyaw));
+  Eigen::Quaterniond q_cur(quat(0), quat(1), quat(2), quat(3));
+  Eigen::Vector4d q_err;
+  q_err << q_cur.w() - q_yaw.w(), 
+           q_cur.x() - q_yaw.x(),
+           q_cur.y() - q_yaw.y(),
+           q_cur.z() - q_yaw.z(); 
+  
+  penalty = weightYaw * q_err.squaredNorm();
+  gradQuat += weightYaw * 2.0 * q_err;
+
+  // std::cout << "q_cur: " << q_cur.coeffs().transpose() << std::endl;
+  // std::cout << "q_yaw: " << q_yaw.coeffs().transpose() << std::endl;
+  // std::cout << "q_err: " << q_err.transpose() << std::endl;
+  // std::cout << "penalty: " << penalty << std::endl;
+  // std::cout << "gradQuat: " << gradQuat.transpose() << std::endl;
+
+  return penalty;
+}
+
 double QuadManifold::addPerceptionCost(const Eigen::Quaterniond &quad_orient, 
                                            const Eigen::Quaterniond &gate_orient,
                                            const QuadParams &quad_params,
@@ -957,7 +1040,7 @@ bool QuadManifold::smoothedL1(const double &x, const double &mu, double &f,
 
 }
 /****************************************************/
-bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
+bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS3D &input, const Eigen::Vector3d& yaw, Setpoint &output) const {
   output.state.t = t;
   output.input.t = t;
 
@@ -1137,7 +1220,7 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS &input, const 
   return true;
 }
 
-bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS &input,
+bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS3D &input,
                           const Eigen::Vector3d &yaw, Setpoint &output) const {
   output.state.t = t;
   output.input.t = t;
@@ -1310,7 +1393,7 @@ bool QuadManifold::toStateWithTiltYawMass(const double t, const PVAJS &input,
   return true;
 }
 
-bool QuadManifold::toStateWithTiltYawAD(const double t, const PVAJS &input,
+bool QuadManifold::toStateWithTiltYawAD(const double t, const PVAJS3D &input,
                           const Eigen::Vector3d &heading, Setpoint &output,
                           Eigen::Matrix<double, 11, 3> &jacVel,
                           Eigen::Matrix<double, 11, 3> &jacAcc,

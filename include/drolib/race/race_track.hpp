@@ -6,6 +6,7 @@
 #include "drolib/corridor/single_ball.hpp"
 #include "drolib/file/file_utils.hpp"
 #include "drolib/planner/traj_data.hpp"
+#include "drolib/planner/traj_se3_data.hpp"
 #include "drolib/polynomial/piecewise_polynomial.hpp"
 #include "drolib/type/quad_state.hpp"
 #include "drolib/utils/logger.hpp"
@@ -54,6 +55,10 @@ public:
   bool getData(const TrajData &prev, TrajData &cur);
 
   bool getData(const double speedGuess, TrajData &tdata);
+
+  bool getSE3Data(const double speedGuess, const double initYaw, TrajSE3Data &se3_data);
+
+  void assignWaypointsSE3(TrajSE3Data &se3_data);
 
   void assignWaypoints(TrajData &tdata);
 
