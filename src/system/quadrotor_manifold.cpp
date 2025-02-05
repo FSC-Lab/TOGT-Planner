@@ -263,9 +263,9 @@ double QuadManifold::computePenalityCostAD(
   // cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
   cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
   cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
-  cost += addYawPenality(setpoint_ad.state.qx, params, gradPerceptionQuat);
-  // cost += addPerceptionCost(setpoint_ad.state.qx, quad_params_, params, gradPerceptionQuat);
-
+  // cost += addYawPenality(setpoint_ad.state.qx, params, gradPerceptionQuat);
+  cost += addPerceptionCost(setpoint_ad.state.qx, quad_params_, params, gradPerceptionQuat);
+  
   gradTotalAcc =
         (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
         +
@@ -300,6 +300,7 @@ double QuadManifold::computePenalityCostAD(
       + gradThrusts(2) * jacHeading.row(9).transpose()   // thrust 3 penalty
       + gradThrusts(3) * jacHeading.row(10).transpose() // thrust 4 penalty
       + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose(); // perception cost
+    
   /**************************** */
   return cost;
 
@@ -881,7 +882,7 @@ double QuadManifold::addYawPenality(const Eigen::Vector4d &quat,
                             Eigen::Ref<Eigen::Vector4d> gradQuat) const {
   double penalty{0.0};
   gradQuat.setZero();
-  const double weightYaw = 1;
+  const double weightYaw = 0.1;
   const double desiredyaw = -M_PI/6;
   const Eigen::Quaterniond q_yaw = eulerAnglesRPYToQuaternion(Eigen::Vector3d(0, 0, desiredyaw));
   Eigen::Quaterniond q_cur(quat(0), quat(1), quat(2), quat(3));
@@ -895,8 +896,8 @@ double QuadManifold::addYawPenality(const Eigen::Vector4d &quat,
   penalty = weightYaw * q_err.squaredNorm();
   gradQuat += weightYaw * 2.0 * q_err;
 
-  // std::cout << "q_cur: " << q_cur.coeffs().transpose() << std::endl;
-  // std::cout << "q_yaw: " << q_yaw.coeffs().transpose() << std::endl;
+  std::cout << "q_cur: " << q_cur.coeffs().transpose() << std::endl;
+  std::cout << "q_yaw: " << q_yaw.coeffs().transpose() << std::endl;
   // std::cout << "q_err: " << q_err.transpose() << std::endl;
   // std::cout << "penalty: " << penalty << std::endl;
   // std::cout << "gradQuat: " << gradQuat.transpose() << std::endl;
@@ -911,7 +912,7 @@ double QuadManifold::addPerceptionCost(const Eigen::Vector4d &quat,
   // Eigen::Quaterniond quat_orient(quat(0), quat(1), quat(2), quat(3));
   // Eigen::Quaterniond gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(0, 90, 0)));
 
-  double penalty{0.0};
+  // double penalty{0.0};
   // gradQuat.setZero();
   // std::cout << "quad_params.q_bc: " << quad_params.q_bc.coeffs().transpose() << std::endl;
   // const Eigen::Quaterniond q_wc = quat_orient * quad_params.q_bc;
@@ -936,11 +937,13 @@ double QuadManifold::addPerceptionCost(const Eigen::Vector4d &quat,
   // std::cout << "penalty: " << penalty << std::endl;
   // std::cout << "gradQuat: " << gradQuat.transpose() << std::endl;
 
+  double penalty{0.0};
+
   Eigen::Vector4d grad_quat;
-  const double weight = 1;
+  const double weight = 0.1;
   double cost = computePerceptionCost(quat, grad_quat);
-  std::cout << "cost: " << cost << std::endl;
-  std::cout << "grad_quat: " << grad_quat.transpose() << std::endl;
+  // std::cout << "cost: " << cost << std::endl;
+  // std::cout << "grad_quat: " << grad_quat.transpose() << std::endl;
   penalty = weight * cost;
   gradQuat = weight * grad_quat;
   return penalty;

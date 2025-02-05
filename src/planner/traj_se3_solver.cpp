@@ -86,10 +86,15 @@ double TrajSE3Solver::costFunction(void *ptr, const Eigen::VectorXd &x,
   obj->minco_yaw.setParameters(obj->data.Y, obj->data.T);
 
 
-  cost += addEnergyCost(obj->minco, obj->minco_yaw, obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
+  // d_energy_d_T, d_energy_d_Cxyz, d_energy_d_Cyaw 
+  // cost += addEnergyCost(obj->minco, obj->minco_yaw, obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
+  
+  // d_J_d_T, d_J_d_Cxyz, d_J_d_Cyaw 
   cost += addPenaltyCost(obj->data.T, obj->minco.getCoeffs(), obj->minco_yaw.getCoeffs(), obj->quad, obj->yawTilt.get(), obj->tparams, obj->data.partialGradByTimes, obj->data.partialGradByCoeffs, obj->data.partialGradByHeadingCoeffs);
-  // std::cout << "obj->data.partialGradByHeadingCoeffs: " << obj->data.partialGradByHeadingCoeffs.norm() << std::endl;
+  
+  // d_Cxyz_d_T, d_Cxyz_d_Pxyz, gradByXYZTimes = d_J_d_T + d_J_d_Cxyz * d_Cxyz_d_T
   obj->minco.propagateGrad(obj->data.partialGradByCoeffs, obj->data.partialGradByTimes, obj->data.gradByPoints, obj->data.gradByXYZTimes);
+  // d_Cyaw_d_T, d_Cyaw_d_Pyaw, gradByYawTimes = d_J_d_Cyaw * d_Cyaw_d_T
   obj->minco_yaw.propagateGrad(obj->data.partialGradByHeadingCoeffs, obj->data.partialGradByTimes, obj->data.gradByYaw, obj->data.gradByYawTimes);
   
   // std::cout << "gradByYaw: " << obj->data.gradByYaw.norm() << std::endl;

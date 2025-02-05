@@ -282,6 +282,25 @@ private:
     return ans;
   }
 
+    inline casadi::SX quat_error(const casadi::SX& q, const casadi::SX& q_ref) {
+        casadi::SX q_aux = casadi::SX::vertcat({
+            q(0) * q_ref(0) + q(1) * q_ref(1) + q(2) * q_ref(2) + q(3) * q_ref(3),
+            -q(1) * q_ref(0) + q(0) * q_ref(1) + q(3) * q_ref(2) - q(2) * q_ref(3),
+            -q(2) * q_ref(0) - q(3) * q_ref(1) + q(0) * q_ref(2) + q(1) * q_ref(3),
+            -q(3) * q_ref(0) + q(2) * q_ref(1) - q(1) * q_ref(2) + q(0) * q_ref(3)
+        });
+
+        // Compute attitude errors with small epsilon to ensure derivative is well-defined
+        casadi::SX q_att_denom = casadi::SX::sqrt(q_aux(0) * q_aux(0) + q_aux(3) * q_aux(3) + 1e-3);
+        casadi::SX q_att = casadi::SX::vertcat({
+            (q_aux(0) * q_aux(1) - q_aux(2) * q_aux(3)) / q_att_denom,
+            (q_aux(0) * q_aux(2) + q_aux(1) * q_aux(3)) / q_att_denom,
+            q_aux(3) / q_att_denom
+        });
+
+        return q_att;
+    }
+
   inline void initPerceptionCostCasadiFunc(const QuadParams params) {
     // casadi::DM gate_orient = vertcat(params.);
     double q_wg_w = params.gate_orient.w();
@@ -294,19 +313,27 @@ private:
     double q_bc_y = params.q_bc.y();
     double q_bc_z = params.q_bc.z();  
 
+    double q_wb_ref_w = params.q_wb_ref.w();
+    double q_wb_ref_x = params.q_wb_ref.x();
+    double q_wb_ref_y = params.q_wb_ref.y();
+    double q_wb_ref_z = params.q_wb_ref.z();
+
     casadi::SX q_wb = casadi::SX::sym("q_wb", 4);
+    casadi::SX q_wb_ref = casadi::SX::vertcat({q_wb_ref_w, q_wb_ref_x, q_wb_ref_y, q_wb_ref_z});
 
 
     // Create a CasADi SX representation of the quaternion
-    casadi::SX q_wg = casadi::SX::vertcat({q_wg_w, q_wg_x, q_wg_y, q_wg_z});
-    casadi::SX q_bc = casadi::SX::vertcat({q_bc_w, q_bc_x, q_bc_y, q_bc_z});
-    casadi::SX q_wc = quat_mult(q_wb, q_bc);
+    // casadi::SX q_wg = casadi::SX::vertcat({q_wg_w, q_wg_x, q_wg_y, q_wg_z});
+    // casadi::SX q_bc = casadi::SX::vertcat({q_bc_w, q_bc_x, q_bc_y, q_bc_z});
+    // casadi::SX q_wc = quat_mult(q_wb, q_bc);
 
-    casadi::SX e_z = casadi::SX::vertcat({0.0, 0.0, 1.0});
-    casadi::SX z_g = rotate_quat(q_wg, e_z);
-    casadi::SX z_c = rotate_quat(q_wc, e_z);
+    // casadi::SX e_z = casadi::SX::vertcat({0.0, 0.0, 1.0});
+    // casadi::SX z_g = rotate_quat(q_wg, e_z);
+    // casadi::SX z_c = rotate_quat(q_wc, e_z);
 
-    casadi::SX cost = 1 * (1.0 - dot_SX(z_c, z_g));
+    // casadi::SX cost = 1 * (1.0 - dot_SX(z_c, z_g));
+    casadi::SX error = quat_error(q_wb, q_wb_ref);
+    casadi::SX cost = dot_SX(error, error);
 
     fun_perception_cost_ =
         casadi::Function("perception_cost", {q_wb}, {cost});

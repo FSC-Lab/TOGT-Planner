@@ -21,6 +21,8 @@ class QuadParams : public ParameterBase {
 
     q_bc = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-60, 0, -90)));
     gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(0, 90, 10)));
+    q_wb_ref = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(0, 0, 25)));
+
 
     std::cout << "q_bc: " << q_bc.coeffs().transpose() << std::endl;
     std::cout << "gate_orient: " << gate_orient.coeffs().transpose() << std::endl;
@@ -55,6 +57,7 @@ class QuadParams : public ParameterBase {
   // Eigen::Vector3d gravityVec;
 
   Eigen::Quaterniond gate_orient{Eigen::Quaterniond::Identity()};
+  Eigen::Quaterniond q_wb_ref{Eigen::Quaterniond::Identity()};
   Eigen::Quaterniond q_bc{Eigen::Quaterniond::Identity()};
   Eigen::Vector3d t_b_cb{Eigen::Vector3d::Zero()};
 
