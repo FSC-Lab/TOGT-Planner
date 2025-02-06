@@ -74,13 +74,19 @@ bool QuadManifold::toStateWithTrueYaw(const double t, const PVAJS3D &input, cons
   //TODO: should be accCmd.norm() instead of collective_thrust
   omg.x() = -1.0 / accCmd.norm() * y_B.dot(jer);
   omg.y() = 1.0 / accCmd.norm() * x_B.dot(jer);
-  omg.z() = 1.0 / (y_c.cross(z_B)).norm() *
-            (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B));
 
-  std::cout << "term1: " << (y_c.cross(z_B)).norm() << std::endl;
-  std::cout << "term2: " << (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B)) << std::endl;
+  if ((y_c.cross(z_B)).norm() < 0.001) {
+    omg.z() = 0.0;
+  } else {
+    omg.z() = 1.0 / (y_c.cross(z_B)).norm() *
+          (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B));
+  }
 
-  std::cout << "omg.z(): " << omg.z() << std::endl;
+
+  // std::cout << "term1: " << (y_c.cross(z_B)).norm() << std::endl;
+  // std::cout << "term2: " << (yawRate * x_c.dot(x_B) + omg.y() * y_c.dot(z_B)) << std::endl;
+
+  // std::cout << "omg.z(): " << omg.z() << std::endl;
 
   omgInput = omg;
   tau.setConstant(0.0);
@@ -944,8 +950,8 @@ double QuadManifold::addBodyratePenalities(const Eigen::Vector3d &omg,
     penalty += params.weightOmg * vPena;
   }
   if (smoothedL1(vz, params.smoothingEps, vPena, vPenaD)) {
-    gradOmg.z() += 10 * params.weightOmg * vPenaD * 2.0 * omg.z();
-    penalty += 10 * params.weightOmg * vPena;
+    gradOmg.z() += params.weightOmg * vPenaD * 2.0 * omg.z();
+    penalty += params.weightOmg * vPena;
   }
 
   return penalty;

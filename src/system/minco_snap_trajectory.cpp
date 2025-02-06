@@ -122,7 +122,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
       extremum.thrusts.add(setpoint.input.thrusts);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     } else {
-      yaw << M_PI/6, 0.0, 0.0;
+      yaw << M_PI/2, 0.0, 0.0;
       // std::cout << "True yaw: " << yaw.transpose() << std::endl;
       quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
