@@ -271,6 +271,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
 
       //TODO: compute yaw angle from another polynomial
       yaw = yawTilt->at(j * step);
+      yaw << M_PI/6, 0.0, 0.0;
 
       pvajs << pos, vel, acc, jer, sna;
       penalty = 0.0;
@@ -278,9 +279,10 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
       /***********************************************/
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
-      penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      penalty += quad.computeSimplePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
       // penalty += quad.computeRobustSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/

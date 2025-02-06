@@ -37,6 +37,14 @@ public:
                             Eigen::Matrix<double, 11, 3> &jacSna,
                             Eigen::Matrix<double, 11, 3> &jacHeading) const;
 
+  bool toStateWithTrueYawAD(const double t, const PVAJS3D &input,
+                          const Eigen::Vector3d &heading, Setpoint &output,
+                          Eigen::Matrix<double, 8, 3> &jacVel,
+                          Eigen::Matrix<double, 8, 3> &jacAcc,
+                          Eigen::Matrix<double, 8, 3> &jacJer,
+                          Eigen::Matrix<double, 8, 3> &jacSna,
+                          Eigen::Matrix<double, 8, 3> &jacHeading) const;
+
   mutable Eigen::Quaterniond q_tilt_last_{1, 0, 0, 0};
 
   bool toStateWithTrueYaw(const double t, const PVAJS3D &input,
@@ -69,7 +77,7 @@ public:
                              Eigen::Vector3d &gradTotalSna,
                              Eigen::Vector3d &gradTotalHeading) const;
 
-  double computePenalityCostAD(const PVAJS3D &pvajs, const Eigen::Vector3d &yaw,
+  double computePenalityCostAD(const PVAJS3D &pvajs, const Eigen::Vector3d &heading,
                              const TrajParams &params,
                              Eigen::Vector3d &gradTotalPos,
                              Eigen::Vector3d &gradTotalVel,
@@ -80,6 +88,13 @@ public:
 
 
   double computeSimplePenalityCost(
+      const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+      Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
+      Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
+      Eigen::Vector3d &gradTotalSna) const;
+
+
+  double computeSimplePenalityCostAD(
       const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
@@ -239,6 +254,13 @@ private:
   casadi::Function fun_forward_singleThr_jacSna_;
   casadi::Function fun_forward_singleThr_jacHeading_;
 
+  casadi::Function fun_forward_rateThr_;
+  casadi::Function fun_forward_rateThr_jacVel_;
+  casadi::Function fun_forward_rateThr_jacAcc_;
+  casadi::Function fun_forward_rateThr_jacJer_;
+  casadi::Function fun_forward_rateThr_jacSna_;
+  casadi::Function fun_forward_rateThr_jacHeading_;
+
   casadi::Function fun_perception_cost_;
   casadi::Function fun_perception_cost_jacQuat_;
 
@@ -282,24 +304,24 @@ private:
     return ans;
   }
 
-    inline casadi::SX quat_error(const casadi::SX& q, const casadi::SX& q_ref) {
-        casadi::SX q_aux = casadi::SX::vertcat({
-            q(0) * q_ref(0) + q(1) * q_ref(1) + q(2) * q_ref(2) + q(3) * q_ref(3),
-            -q(1) * q_ref(0) + q(0) * q_ref(1) + q(3) * q_ref(2) - q(2) * q_ref(3),
-            -q(2) * q_ref(0) - q(3) * q_ref(1) + q(0) * q_ref(2) + q(1) * q_ref(3),
-            -q(3) * q_ref(0) + q(2) * q_ref(1) - q(1) * q_ref(2) + q(0) * q_ref(3)
-        });
+  inline casadi::SX quat_error(const casadi::SX& q, const casadi::SX& q_ref) {
+    casadi::SX q_aux = casadi::SX::vertcat({
+        q(0) * q_ref(0) + q(1) * q_ref(1) + q(2) * q_ref(2) + q(3) * q_ref(3),
+        -q(1) * q_ref(0) + q(0) * q_ref(1) + q(3) * q_ref(2) - q(2) * q_ref(3),
+        -q(2) * q_ref(0) - q(3) * q_ref(1) + q(0) * q_ref(2) + q(1) * q_ref(3),
+        -q(3) * q_ref(0) + q(2) * q_ref(1) - q(1) * q_ref(2) + q(0) * q_ref(3)
+    });
 
-        // Compute attitude errors with small epsilon to ensure derivative is well-defined
-        casadi::SX q_att_denom = casadi::SX::sqrt(q_aux(0) * q_aux(0) + q_aux(3) * q_aux(3) + 1e-3);
-        casadi::SX q_att = casadi::SX::vertcat({
-            (q_aux(0) * q_aux(1) - q_aux(2) * q_aux(3)) / q_att_denom,
-            (q_aux(0) * q_aux(2) + q_aux(1) * q_aux(3)) / q_att_denom,
-            q_aux(3) / q_att_denom
-        });
+    // Compute attitude errors with small epsilon to ensure derivative is well-defined
+    casadi::SX q_att_denom = casadi::SX::sqrt(q_aux(0) * q_aux(0) + q_aux(3) * q_aux(3) + 1e-3);
+    casadi::SX q_att = casadi::SX::vertcat({
+        (q_aux(0) * q_aux(1) - q_aux(2) * q_aux(3)) / q_att_denom,
+        (q_aux(0) * q_aux(2) + q_aux(1) * q_aux(3)) / q_att_denom,
+        q_aux(3) / q_att_denom
+    });
 
-        return q_att;
-    }
+    return q_att;
+}
 
   inline void initPerceptionCostCasadiFunc(const QuadParams params) {
     // casadi::DM gate_orient = vertcat(params.);
@@ -344,6 +366,104 @@ private:
 
   }
 
+  casadi::SX rotmat_to_quat(const casadi::SX& R) {
+        casadi::SX qw, qx, qy, qz;
+
+        qw = 0.5 * casadi::SX::sqrt(R(0,0) + R(1,1) + R(2,2) + 1);
+        qx = (R(2,1) - R(1,2)) / (4 * qw);
+        qy = (R(0,2) - R(2,0)) / (4 * qw);
+        qz = (R(1,0) - R(0,1)) / (4 * qw);
+
+        return casadi::SX::vertcat({qw, qx, qy, qz});
+  }
+
+  inline void initRateThrCasadiFunc(const QuadParams params) {
+    const double grav = G;
+    const double mass = params.mass;
+
+    // function inuputs
+    casadi::SX v_0 = casadi::SX::sym("v_0", 1);
+    casadi::SX v_1 = casadi::SX::sym("v_1", 1);
+    casadi::SX v_2 = casadi::SX::sym("v_2", 1);
+    casadi::SX vel = vertcat(v_0, v_1, v_2);
+
+    casadi::SX a_0 = casadi::SX::sym("a_0", 1);
+    casadi::SX a_1 = casadi::SX::sym("a_1", 1);
+    casadi::SX a_2 = casadi::SX::sym("a_2", 1);
+    casadi::SX acc = vertcat(a_0, a_1, a_2);
+
+    casadi::SX j_0 = casadi::SX::sym("j_0", 1);
+    casadi::SX j_1 = casadi::SX::sym("j_1", 1);
+    casadi::SX j_2 = casadi::SX::sym("j_2", 1);
+    casadi::SX jer = vertcat(j_0, j_1, j_2);
+
+    casadi::SX s_0 = casadi::SX::sym("s_0", 1);
+    casadi::SX s_1 = casadi::SX::sym("s_1", 1);
+    casadi::SX s_2 = casadi::SX::sym("s_2", 1);
+    casadi::SX sna = vertcat(s_0, s_1, s_2);
+
+    casadi::SX yaw = casadi::SX::sym("yaw", 1);
+    casadi::SX dyaw = casadi::SX::sym("dyaw", 1);
+    casadi::SX ddyaw = casadi::SX::sym("ddyaw", 1);
+    casadi::SX heading = vertcat(yaw, dyaw, ddyaw);
+
+    casadi::SX gvec = casadi::SX::vertcat({0, 0, grav});
+
+    // Compute acceleration command
+    casadi::SX accCmd = acc + gvec;
+
+    // Compute collective thrust (thrust-mass ratio)
+    casadi::SX collective_thrust = casadi::SX::norm_2(accCmd);
+
+    // Compute desired orientation
+    casadi::SX yaw_half = yaw / 2;
+    casadi::SX q_c = casadi::SX::vertcat({cos(yaw_half), 0, 0, sin(yaw_half)});
+    casadi::SX x_c = rotate_quat(q_c, casadi::SX::vertcat({1, 0, 0}));
+    casadi::SX y_c = rotate_quat(q_c, casadi::SX::vertcat({0, 1, 0}));
+
+    // Compute body frame basis vectors
+    casadi::SX z_B = accCmd / collective_thrust;
+    casadi::SX x_B = casadi::SX::cross(y_c, z_B);
+    x_B = x_B / casadi::SX::norm_2(x_B);
+    casadi::SX y_B = casadi::SX::cross(z_B, x_B);
+
+    // // Compute rotation matrix and quaternion
+    casadi::SX R_W_B = casadi::SX::horzcat({x_B, y_B, z_B});
+    casadi::SX quatDes = rotmat_to_quat(R_W_B);
+
+    // Compute angular velocity
+    casadi::SX omg_x = -1.0 / casadi::SX::norm_2(accCmd) * casadi::SX::dot(y_B, jer);
+    casadi::SX omg_y = 1.0 / casadi::SX::norm_2(accCmd) * casadi::SX::dot(x_B, jer);
+    casadi::SX omg_z = 1.0 / casadi::SX::norm_2(casadi::SX::cross(y_c, z_B)) *
+                    (dyaw * casadi::SX::dot(x_c, x_B) + omg_y * casadi::SX::dot(y_c, z_B));
+
+    casadi::SX omg = casadi::SX::vertcat({omg_x, omg_y, omg_z});
+
+    casadi::SX state = vertcat(std::vector<casadi::SX>{
+        quatDes, omg_x, omg_y, omg_z, collective_thrust});
+
+    fun_forward_rateThr_ =
+        casadi::Function("state", {vel, acc, jer, sna, heading}, {state});
+
+    casadi::SX jac_vel = jacobian(state, vel);
+    casadi::SX jac_acc = jacobian(state, acc);
+    casadi::SX jac_jer = jacobian(state, jer);
+    casadi::SX jac_sna = jacobian(state, sna);
+    casadi::SX jac_heading = jacobian(state, heading);
+
+    fun_forward_rateThr_jacVel_ = casadi::Function(
+        "jac_vel", {vel, acc, jer, sna, heading}, {densify(jac_vel)});
+    fun_forward_rateThr_jacAcc_ = casadi::Function(
+        "jac_acc", {vel, acc, jer, sna, heading}, {densify(jac_acc)});
+    fun_forward_rateThr_jacJer_ = casadi::Function(
+        "jac_jer", {vel, acc, jer, sna, heading}, {densify(jac_jer)});
+    fun_forward_rateThr_jacSna_ = casadi::Function(
+        "jac_sna", {vel, acc, jer, sna, heading}, {densify(jac_sna)});
+    fun_forward_rateThr_jacHeading_ = casadi::Function(
+        "jac_heading", {vel, acc, jer, sna, heading}, {densify(jac_heading)});
+
+    return;
+  }
 
   inline void initSingleThrCasadiFunc(const QuadParams params) {
     const double I_x = params.inertia.x();
@@ -551,6 +671,119 @@ private:
         "jac_heading", {vel, acc, jer, sna, heading}, {densify(jac_heading)});
 
     return;
+  }
+
+
+  inline void
+  forwardRateThrAD(const Eigen::Vector3d &vel, const Eigen::Vector3d &acc,
+                     const Eigen::Vector3d &jer, const Eigen::Vector3d &sna,
+                     const Eigen::Vector3d &heading, Eigen::Vector4d &quat,
+                     Eigen::Vector3d &omg, double &collective_thrust,
+                     Eigen::Matrix<double, 8, 3> &jacVel,
+                     Eigen::Matrix<double, 8, 3> &jacAcc,
+                     Eigen::Matrix<double, 8, 3> &jacJer,
+                     Eigen::Matrix<double, 8, 3> &jacSna,
+                     Eigen::Matrix<double, 8, 3> &jacHeading) const {
+    // evaluate fun_forward_rateThr_:
+    Eigen::Matrix<double, 8, 1> state;
+    size_t sz_arg = fun_forward_rateThr_.sz_arg();
+    size_t sz_res = fun_forward_rateThr_.sz_res();
+    const double *arg[sz_arg];
+    const double *input_st_0 = vel.data();
+    const double *input_st_1 = acc.data();
+    const double *input_st_2 = jer.data();
+    const double *input_st_3 = sna.data();
+    const double *input_st_4 = heading.data();
+
+    arg[0] = (const double *)input_st_0;
+    arg[1] = (const double *)input_st_1;
+    arg[2] = (const double *)input_st_2;
+    arg[3] = (const double *)input_st_3;
+    arg[4] = (const double *)input_st_4;
+
+    double *res_f[sz_res];
+    res_f[0] = (double *)state.data();
+    casadi_int *iw_f = new casadi_int[fun_forward_rateThr_.sz_iw()];
+    double *w_f = new double[fun_forward_rateThr_.sz_w()];
+    fun_forward_rateThr_(arg, res_f, iw_f, w_f);
+
+    quat(0) = state(0);
+    quat(1) = state(1);
+    quat(2) = state(2);
+    quat(3) = state(3);
+    omg(0) = state(4);
+    omg(1) = state(5);
+    omg(2) = state(6);
+    collective_thrust = state(7);
+
+    delete iw_f;
+    delete w_f;
+
+    // evaluate jacVel
+    jacVel.setZero();
+    size_t sz_res_jacVel = fun_forward_rateThr_jacVel_.sz_res();
+    double *res_jacVel[sz_res_jacVel];
+    res_jacVel[0] = (double *)jacVel.data();
+    casadi_int *iw_jacVel =
+        new casadi_int[fun_forward_rateThr_jacVel_.sz_iw()];
+    double *w_jacVel = new double[fun_forward_rateThr_jacVel_.sz_w()];
+    fun_forward_rateThr_jacVel_(arg, res_jacVel, iw_jacVel, w_jacVel);
+
+    delete iw_jacVel;
+    delete w_jacVel;
+
+    // evaluate jacAcc
+    jacAcc.setZero();
+    size_t sz_res_jacAcc = fun_forward_rateThr_jacAcc_.sz_res();
+    double *res_jacAcc[sz_res_jacAcc];
+    res_jacAcc[0] = (double *)jacAcc.data();
+    casadi_int *iw_jacAcc =
+        new casadi_int[fun_forward_rateThr_jacAcc_.sz_iw()];
+    double *w_jacAcc = new double[fun_forward_rateThr_jacAcc_.sz_w()];
+    fun_forward_rateThr_jacAcc_(arg, res_jacAcc, iw_jacAcc, w_jacAcc);
+
+    delete iw_jacAcc;
+    delete w_jacAcc;
+
+    // evaluate jacJer
+    jacJer.setZero();
+    size_t sz_res_jacJer = fun_forward_rateThr_jacJer_.sz_res();
+    double *res_jacJer[sz_res_jacJer];
+    res_jacJer[0] = (double *)jacJer.data();
+    casadi_int *iw_jacJer =
+        new casadi_int[fun_forward_rateThr_jacJer_.sz_iw()];
+    double *w_jacJer = new double[fun_forward_rateThr_jacJer_.sz_w()];
+    fun_forward_rateThr_jacJer_(arg, res_jacJer, iw_jacJer, w_jacJer);
+
+    delete iw_jacJer;
+    delete w_jacJer;
+
+    // evaluate jacSna
+    jacSna.setZero();
+    size_t sz_res_jacSna = fun_forward_rateThr_jacSna_.sz_res();
+    double *res_jacSna[sz_res_jacSna];
+    res_jacSna[0] = (double *)jacSna.data();
+    casadi_int *iw_jacSna =
+        new casadi_int[fun_forward_rateThr_jacSna_.sz_iw()];
+    double *w_jacSna = new double[fun_forward_rateThr_jacSna_.sz_w()];
+    fun_forward_rateThr_jacSna_(arg, res_jacSna, iw_jacSna, w_jacSna);
+
+    delete iw_jacSna;
+    delete w_jacSna;
+
+    // evaluate jacHeading
+    jacHeading.setZero();
+    size_t sz_res_jacHeading = fun_forward_rateThr_jacHeading_.sz_res();
+    double *res_jacHeading[sz_res_jacHeading];
+    res_jacHeading[0] = (double *)jacHeading.data();
+    casadi_int *iw_jacHeading =
+        new casadi_int[fun_forward_rateThr_jacHeading_.sz_iw()];
+    double *w_jacHeading = new double[fun_forward_rateThr_jacHeading_.sz_w()];
+    fun_forward_rateThr_jacHeading_(arg, res_jacHeading, iw_jacHeading,
+                                      w_jacHeading);
+
+    delete iw_jacHeading;
+    delete w_jacHeading;
   }
 
   inline void
