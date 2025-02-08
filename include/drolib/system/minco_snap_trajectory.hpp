@@ -143,7 +143,7 @@ struct MincoSnapTrajectory {
 
   Eigen::Quaterniond prev_quat{Eigen::Quaterniond::Identity()};
 
-  double horizon{5.0};
+  double horizon{0.1};
 
 
   friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);

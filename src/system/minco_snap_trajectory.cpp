@@ -81,16 +81,15 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
     // TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
     if (heading_type == HeadingType::FORWARD_HEADING) {
       // yaw << getHeading(pvajs.col(2), pvajs.col(1), lastTilt, lastHeading), 0.0, 0.0;
-      horizon = 1.0;
-      std::cout << "horizon" << horizon << std::endl;
+  
       double heading{0.0};
       const auto pvajs_future = polys.getPVAJS(std::min(T, t + horizon));
 
-      std::cout << "t: " << t << std::endl;
-      std::cout << "t_future: " << std::min(T, t + horizon) << std::endl;
+      // std::cout << "t: " << t << std::endl;
+      // std::cout << "t_future: " << std::min(T, t + horizon) << std::endl;
       const Eigen::Vector3d future_pos = pvajs_future.col(0);
 
-      std::cout << "future_pos: " << future_pos.transpose() << ", current: " << pos.transpose() << std::endl;
+      // std::cout << "future_pos: " << future_pos.transpose() << ", current: " << pos.transpose() << std::endl;
       const Eigen::Vector3d diff = future_pos - pos;
       if (diff.head<2>().norm() > 1e-3) {
           heading = wrapMinusPiToPi(atan2(diff.y(), diff.x()));

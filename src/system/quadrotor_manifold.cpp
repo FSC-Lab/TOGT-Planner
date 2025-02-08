@@ -103,11 +103,11 @@ double QuadManifold::computePenalityCost(
 
   Setpoint setpoint;
   toStateWithTiltYawMass(0.0, pvajs, heading, setpoint);
-  // cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
-  // cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
+  cost += addVelocityPenalities(setpoint.state.v, params, gradVel);
+  cost += addRotationPenalities(setpoint.state.qx, params, gradQuat);
   cost += addBodyratePenalities(setpoint.state.w, params, gradOmg);
   cost += addThrustsPenalities(setpoint.input.thrusts, params, gradThrusts);
-  // cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
+  cost += addBoundaryPenalities(setpoint.state.p, params, gradPos);
 
   backPropagate(gradPos, gradVel, gradQuat, gradOmg,
                           gradThrusts, gradTotalPos, gradTotalVel,
@@ -260,11 +260,11 @@ double QuadManifold::computePenalityCostAD(
   Eigen::Matrix<double, 11, 3> jacHeading;
   toStateWithTiltYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
 
-  std::cout << "jacHeading: " << jacHeading.transpose() << std::endl;
+  // std::cout << "jacHeading: " << jacHeading.transpose() << std::endl;
   cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
   cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
   cost += addThrustsPenalities(setpoint_ad.input.thrusts, params, gradThrusts);
-  cost += addYawPenality(setpoint_ad.state.qx, params, gradPerceptionQuat);
+  // cost += addYawPenality(setpoint_ad.state.qx, params, gradPerceptionQuat);
 
 
   // double objective = computePerceptionCost(setpoint_ad.state.qx, gradPerceptionQuat);
