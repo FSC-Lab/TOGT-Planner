@@ -281,6 +281,9 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
       // penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+     
+      // penalty += quad.computeSimplePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+
       /***********************************************/
       // penalty += quad.computeRobustSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/

@@ -21,6 +21,13 @@ bool RacePlanner::planAOS(std::shared_ptr<RaceTrack> track) {
     return planTOGT(track);
   }
 
+  const auto initState = track->initState;
+  const auto endState = track->endState;
+  const auto initYaw = quaternionToEulerAnglesRPY(initState.q()).z();
+  const auto endYaw = quaternionToEulerAnglesRPY(endState.q()).z();
+  std::cout << "initYaw: " << rad2deg(initYaw) << std::endl;
+  std::cout << "endYaw: " << rad2deg(endYaw) << std::endl;
+
   // Solve initial guesses
   {
     bool success{false};
@@ -81,11 +88,11 @@ bool RacePlanner::planAOS(std::shared_ptr<RaceTrack> track) {
         std::cout << "Drone will keep maintaining zero yaw angle!" << std::endl;
         htype_ = MincoSnapTrajectory::HeadingType::CONSTANT_HEADING;
         trajectory_ = MincoSnapTrajectory(
-            params_.qp.name, quad_, initdata, desiredYaw_, desiredYaw_,
+            params_.qp.name, quad_, initdata, initYaw, endYaw,
             track->getName() + " Trajectory", rtype_, htype_);
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
       }
-      std::cout << "Use first optimizatoin result!\n";
+      std::cerr << "Use first optimizatoin result!" << std::endl;
       return true;
       // return false;
     }
@@ -103,7 +110,7 @@ bool RacePlanner::planAOS(std::shared_ptr<RaceTrack> track) {
   } else {
     htype_ = MincoSnapTrajectory::HeadingType::CONSTANT_HEADING;
     trajectory_ = MincoSnapTrajectory(
-        params_.qp.name, quad_, solver_.data, desiredYaw_, desiredYaw_,
+        params_.qp.name, quad_, solver_.data, initYaw, endYaw,
         track->getName() + " Trajectory", rtype_, htype_);
     extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
   }
@@ -120,6 +127,13 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
   if (params_.tprefine.piecesPerSegment == 1) {
     return planTOGT(track);
   }
+
+  const auto initState = track->initState;
+  const auto endState = track->endState;
+  const double initYaw = quaternionToEulerAnglesRPY(initState.q()).z();
+  const double endYaw = quaternionToEulerAnglesRPY(endState.q()).z();
+  std::cout << "initYaw: " << rad2deg(initYaw) << std::endl;
+  std::cout << "endYaw: " << rad2deg(endYaw) << std::endl;
 
   // Solve initial guesses
   {
@@ -181,11 +195,11 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, true);
       } else {
         trajectory_ = MincoSnapTrajectory(
-            params_.qp.name, quad_, initdata, desiredYaw_, desiredYaw_,
+            params_.qp.name, quad_, initdata, initYaw, endYaw,
             track->getName() + " Trajectory", rtype_, htype_);
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
       }
-      std::cout << "Use first optimizatoin result!\n";
+      std::cerr << "Use first optimizatoin result!\n";
       // return false;
     } else {
       if (forwardHeading_) {
@@ -204,7 +218,7 @@ bool RacePlanner::plan(std::shared_ptr<RaceTrack> track) {
         std::cout << "Not using forward heading" << std::endl;
 
         trajectory_ = MincoSnapTrajectory(
-            params_.qp.name, quad_, solver_.data, desiredYaw_, desiredYaw_,
+            params_.qp.name, quad_, solver_.data, initYaw, endYaw,
             track->getName() + " Trajectory", rtype_, htype_);
         extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_);
         trajectory_.getSetpointVecByDist(sampleDistMeter_);

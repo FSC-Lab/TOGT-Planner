@@ -19,6 +19,7 @@ QuadManifold::QuadManifold(const QuadParams params) : quad_params_(params) {
 
   eps = std::numeric_limits<double>::epsilon();
 
+  initRateThrCasadiFunc(quad_params_);
   initSingleThrCasadiFunc(quad_params_);
   initPerceptionCostCasadiFunc(quad_params_);
 }
@@ -229,6 +230,57 @@ double QuadManifold::computePenalityCost(
 //   return cost;
 
 }
+
+double QuadManifold::computeSimplePenalityCostAD(
+    const PVAJS3D &pvajs, const Eigen::Vector3d &heading, const TrajParams &params,
+    Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
+    Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
+    Eigen::Vector3d &gradTotalSna, Eigen::Vector3d &gradTotalHeading) const {
+  double cost{0.0};
+  Eigen::Vector3d gradPos{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradVel{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d gradOmg{Eigen::Vector3d::Zero()};
+  Eigen::Vector4d gradQuat{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d gradPerceptionQuat{Eigen::Vector4d::Zero()};
+  double gradThrust{0.0};
+
+  gradTotalPos.setZero();
+  gradTotalVel.setZero();
+  gradTotalAcc.setZero();
+  gradTotalJer.setZero();
+  gradTotalSna.setZero();
+  gradTotalHeading.setZero();
+  
+  Eigen::Matrix<double, 8, 3> jacVel;
+  Eigen::Matrix<double, 8, 3> jacAcc;
+  Eigen::Matrix<double, 8, 3> jacJer;
+  Eigen::Matrix<double, 8, 3> jacSna;
+  Eigen::Matrix<double, 8, 3> jacHeading;
+  Setpoint setpoint_ad;
+  toStateWithTrueYawAD(0.0, pvajs, heading, setpoint_ad, jacVel, jacAcc, jacJer, jacSna, jacHeading);
+  
+  cost += addRotationPenalities(setpoint_ad.state.qx, params, gradQuat);
+  cost += addBodyratePenalities(setpoint_ad.state.w, params, gradOmg);
+  cost += addThrustPenality(setpoint_ad.input.collective_thrust * quad_params_.mass, params, gradThrust);
+
+  gradTotalAcc =
+        (gradQuat.transpose() * jacAcc.topRows(4)).transpose() // quat penalty
+        + (gradOmg.transpose() * jacAcc.middleRows(4, 3)).transpose()
+        + gradThrust * quad_params_.mass * jacAcc.row(7).transpose()
+        + (gradPerceptionQuat.transpose() * jacAcc.topRows(4)).transpose();
+  
+  gradTotalJer =
+      (gradOmg.transpose() * jacJer.middleRows(4, 3)).transpose();
+
+  gradTotalHeading = 
+      (gradQuat.transpose() * jacHeading.topRows(4)).transpose() // quat penalty
+       + (gradOmg.transpose() * jacHeading.middleRows(4, 3)).transpose()
+       + (gradPerceptionQuat.transpose() * jacHeading.topRows(4)).transpose();
+  
+  
+  return cost;
+}
+
 
 double QuadManifold::computePenalityCostAD(
     const PVAJS3D &pvajs, const Eigen::Vector3d& heading, const TrajParams &params,
@@ -1458,6 +1510,51 @@ bool QuadManifold::toStateWithTiltYawAD(const double t, const PVAJS3D &input,
 }
 
 
+bool QuadManifold::toStateWithTrueYawAD(const double t, const PVAJS3D &input,
+                          const Eigen::Vector3d &heading, Setpoint &output,
+                          Eigen::Matrix<double, 8, 3> &jacVel,
+                          Eigen::Matrix<double, 8, 3> &jacAcc,
+                          Eigen::Matrix<double, 8, 3> &jacJer,
+                          Eigen::Matrix<double, 8, 3> &jacSna,
+                          Eigen::Matrix<double, 8, 3> &jacHeading) const {
+  output.state.t = t;
+  output.input.t = t;
+
+  Eigen::Ref<Eigen::Vector3d> pos = output.state.p;
+  Eigen::Ref<Eigen::Vector3d> vel = output.state.v;
+  Eigen::Ref<Eigen::Vector3d> acc = output.state.a;
+  Eigen::Ref<Eigen::Vector3d> jer = output.state.j;
+  Eigen::Ref<Eigen::Vector3d> sna = output.state.s;
+  Eigen::Ref<Eigen::Vector3d> omg = output.state.w;
+  Eigen::Ref<Eigen::Vector4d> quat = output.state.qx;
+
+  Eigen::Vector3d& omgInput = output.input.omega; 
+  double& thrust = output.input.collective_thrust; 
+
+  pos = input.col(0);
+  vel = input.col(1);  
+  acc = input.col(2);
+  jer = input.col(3);
+  sna = input.col(4);
+
+  jacVel.setZero();
+  jacAcc.setZero();
+  jacJer.setZero();
+  jacSna.setZero();
+  jacHeading.setZero();
+  Eigen::Vector4d quat_tmp;
+  Eigen::Vector3d omg_tmp;
+  double collective_thrust_tmp;
+  forwardRateThrAD(vel, acc, jer, sna, heading, quat_tmp, omg_tmp, collective_thrust_tmp, jacVel,
+                                jacAcc, jacJer, jacSna, jacHeading);
+  quat = quat_tmp;
+  omg = omg_tmp;                              
+  omgInput = omg_tmp;
+  thrust = collective_thrust_tmp;
+
+  return true;
+
+}
 
 void QuadManifold::backPropagate(
     const Eigen::Vector3d &gradPos, const Eigen::Vector3d &gradVel,

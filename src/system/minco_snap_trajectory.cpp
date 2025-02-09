@@ -101,9 +101,13 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
         // std::cout << "yaw: " << yaw.transpose() << std::endl;
         lastHeading = heading;
     } else {
-      yaw << 0.0, 0.0, 0.0;
+      // std::cout << "start_yaw: " << rad2deg(start_yaw) << std::endl;
+      yaw << start_yaw, 0.0, 0.0;
     }
+
+    // TODO(chao): delete this part
     // rotation_type = RotationType::ROLL_PITCH_YAW;
+    // std::cout << "RotationType::ROLL_PITCH_YAW" << std::endl;
     if (rotation_type == RotationType::TILT_HEADING) {
       quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
       const Eigen::Quaterniond curr_quat = setpoint.state.q();
@@ -119,6 +123,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     } else {
       quad.toStateWithTrueYaw(t, pvajs, yaw, setpoint);
+      extremum.thrusts.add(setpoint.input.thrusts);
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     }
     extremum.tilt.add(setpoint.state.getTiltedAngle());
@@ -136,6 +141,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   // Add the last setpoint
   pvajs = polys.getPVAJS(t);
+  yaw << end_yaw, 0.0, 0.0;
   if (rotation_type == RotationType::TILT_HEADING) {
     quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
   } else {
