@@ -257,6 +257,128 @@ bool MincoSnapTrajectory::saveAllWaypoints(const std::string &filename) {
   return true;
 }
 
+bool MincoSnapTrajectory::saveSegments(const std::string &filename, 
+                                        const std::vector<std::pair<int, int>>& segments, 
+                                        const std::vector<Eigen::Vector3d> &gate_centers,
+                                        const std::vector<Eigen::Vector3d> &gate_orients) {
+  if (!polys.valid()) {
+    return false;
+  }
+  Eigen::VectorXd durations = polys.getDurations();
+  Eigen::Matrix3Xd points = polys.getPoints();
+
+  const int nSegments = segments.size();
+ 
+  Eigen::VectorXd raceDurations;
+  Eigen::Matrix3Xd raceWaypoints;
+  raceDurations.resize(nSegments);
+  raceWaypoints.resize(3, nSegments - 1);
+
+  std::cout << "piece number: " << durations.size() << std::endl;
+
+  for (int i = 0; i < nSegments; ++i) {
+    if (segments[i].first < 0 || segments[i].second < 0) {
+      return false;
+    }
+
+    std::cout << "segments[" << i << "]: " << segments[i].first << ", " << segments[i].second << std::endl;
+  }
+
+  int idx{0};
+  for (int i{0}; i < nSegments; ++i) {
+    double dur = durations.segment(segments[i].first, segments[i].second).sum();
+    raceDurations[i] = dur;
+    // std::cout << "idx: " << idx << " dur: " << dur << std::endl;
+    idx += segments[i].second;
+    if (i < nSegments - 1) {
+      Eigen::Vector3d pos = points.col(idx);
+      raceWaypoints.col(i) = pos;
+    }
+  }
+
+  std::vector<double> timestamps;
+
+  timestamps.push_back(0.0);
+  for (int i = 0; i < raceDurations.size(); ++i) {
+    timestamps.push_back(timestamps.back() + raceDurations[i]);
+  }
+
+  std::ofstream file;
+  // fs::create_directory("/home/fsc1/chao/ros_ws/togt_ws/src/drone_common/droros/droros/results/cpc");
+  file.open(filename.c_str());
+  file.precision(4);
+
+  file << "waypoints: [";
+  for (int i{0}; i < raceWaypoints.cols(); ++i) {
+    if (i < raceWaypoints.cols() - 1) {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "],\n            ";
+    } else {
+      file << "[" << raceWaypoints.col(i).x() << ", "
+           << raceWaypoints.col(i).y() << ", " << raceWaypoints.col(i).z()
+           << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "timestamps: [";
+  for (int i{0}; i < timestamps.size(); ++i) {
+    if (i < timestamps.size() - 1) {
+      file << timestamps[i] << ",\n            ";
+    } else {
+      file << timestamps[i];
+    }
+  }
+  file << "]\n\n";
+
+  file << "durations: [";
+  for (int i{0}; i < raceDurations.size(); ++i) {
+    if (i < raceDurations.size() - 1) {
+      file << raceDurations[i] << ",\n            ";
+    } else {
+      file << raceDurations[i];
+    }
+  }
+  file << "]\n\n";
+
+  file << "gate_centers: [";
+  for (int i{0}; i < gate_centers.size(); ++i) {
+    if (i < gate_centers.size() - 1) {
+      file << "[" << gate_centers[i].x() << ", "
+           << gate_centers[i].y() << ", " << gate_centers[i].z()
+           << "],\n            ";
+    } else {
+      file << "[" << gate_centers[i].x() << ", "
+           << gate_centers[i].y() << ", " << gate_centers[i].z()
+           << "]";
+    }
+  }
+  file << "]\n\n";
+
+  file << "gate_orients: [";
+  for (int i{0}; i < gate_orients.size(); ++i) {
+    if (i < gate_orients.size() - 1) {
+      file << "[" << gate_orients[i].x() << ", "
+           << gate_orients[i].y() << ", " << gate_orients[i].z()
+           << "],\n            ";
+    } else {
+      file << "[" << gate_orients[i].x() << ", "
+           << gate_orients[i].y() << ", " << gate_orients[i].z()
+           << "]";
+    }
+  }
+
+  file << "]";
+
+
+  file.precision();
+  file.close();
+
+  return true;
+}
+
+
 bool MincoSnapTrajectory::saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments) {
   if (!polys.valid()) {
     return false;

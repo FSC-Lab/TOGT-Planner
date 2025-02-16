@@ -277,7 +277,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
 
       /***********************************************/
       // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
-      penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       // penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
       /***********************************************/
       // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
@@ -287,7 +287,7 @@ double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
       /***********************************************/
       // penalty += quad.computeRobustSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
-      // penalty += quad.computeRobustPenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      penalty += quad.computeRobustPenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
       /***********************************************/
       node = (j == 0 || j == numCheckPerPiece) ? 0.5 : 1.0;
       alpha = j * integralFrac;

@@ -2,13 +2,13 @@
 
 #include "drolib/planner/angle.hpp"
 #include "drolib/planner/traj_data.hpp"
+#include "drolib/polynomial/cubic_spline.h"
 #include "drolib/rotation/rotation_utils.h"
 #include "drolib/type/types.hpp"
-#include "drolib/polynomial/cubic_spline.h"
 
-#include "drolib/type/set_point.hpp"
-#include "drolib/system/quadrotor_manifold.hpp"
 #include "drolib/math/min_max_recorder.hpp"
+#include "drolib/system/quadrotor_manifold.hpp"
+#include "drolib/type/set_point.hpp"
 // #include <numeric>
 namespace drolib {
 
@@ -41,22 +41,26 @@ struct TrajExtremum {
     // os << std::scientific;
     os << std::fixed;
     os << "TrajExtremum:\n"
-      << "maxVel:     " << extremum.vel.max() << " [m/s]\n"
-      << "maxAcc:     " << extremum.acc.max() << " [m^2/s]\n"
-      << "maxTilt:    " << rad2deg(extremum.tilt.max()) << " [deg]\n"
-      << "minOmg:     " << extremum.omg.min().transpose() << " [rad/s]\n"
-      << "maxOmg:     " << extremum.omg.max().transpose() << " [rad/s]\n"
-      << "minEuler:   " << extremum.rpy.min().transpose() << " [deg]\n"
-      << "maxEuler:   " << extremum.rpy.max().transpose() << " [deg]\n";
+       << "maxVel:     " << extremum.vel.max() << " [m/s]\n"
+       << "maxAcc:     " << extremum.acc.max() << " [m^2/s]\n"
+       << "maxTilt:    " << rad2deg(extremum.tilt.max()) << " [deg]\n"
+       << "minOmg:     " << extremum.omg.min().transpose() << " [rad/s]\n"
+       << "maxOmg:     " << extremum.omg.max().transpose() << " [rad/s]\n"
+       << "minEuler:   " << extremum.rpy.min().transpose() << " [deg]\n"
+       << "maxEuler:   " << extremum.rpy.max().transpose() << " [deg]\n";
     if (extremum.thrusts.min().norm() < 1.0e6 &&
         extremum.thrusts.max().norm() < 1.0e6) {
       os << "minThrusts: " << extremum.thrusts.min().transpose() << " [N]\n"
-        << "maxThrusts: " << extremum.thrusts.max().transpose() << " [N]\n"
-        << "minCollectivethrust: " << extremum.collectiveThrust.min() << " [N]\n"
-        << "maxCollectivethrust: " << extremum.collectiveThrust.max() << " [N]\n";
+         << "maxThrusts: " << extremum.thrusts.max().transpose() << " [N]\n"
+         << "minCollectivethrust: " << extremum.collectiveThrust.min()
+         << " [N]\n"
+         << "maxCollectivethrust: " << extremum.collectiveThrust.max()
+         << " [N]\n";
     } else {
-      os << "minCollectivethrust: " << extremum.collectiveThrust.min() << " [N]\n"
-        << "maxCollectivethrust: " << extremum.collectiveThrust.max() << " [N]\n";
+      os << "minCollectivethrust: " << extremum.collectiveThrust.min()
+         << " [N]\n"
+         << "maxCollectivethrust: " << extremum.collectiveThrust.max()
+         << " [N]\n";
     }
     os << "-----------------------------------------\n"
        << "Length:   " << extremum.length << " [m]\n"
@@ -65,7 +69,6 @@ struct TrajExtremum {
     // os.unsetf(std::ios::scientific);
     return os;
   }
-
 };
 
 struct MincoSnapTrajectory {
@@ -77,19 +80,16 @@ struct MincoSnapTrajectory {
     FORWARD_HEADING = 2
   };
 
-  MincoSnapTrajectory(const std::string quad_name, 
-                      const QuadManifold& quad,
-                      const TrajData &data,
-                      const double start_yaw, const double end_yaw = 0.0,
-                      const std::string& name = "MincoSnap Trajectory",
+  MincoSnapTrajectory(const std::string quad_name, const QuadManifold &quad,
+                      const TrajData &data, const double start_yaw,
+                      const double end_yaw = 0.0,
+                      const std::string &name = "MincoSnap Trajectory",
                       const RotationType rtype = RotationType::TILT_HEADING,
                       const HeadingType htype = HeadingType::CONSTANT_HEADING);
 
-  MincoSnapTrajectory(const std::string quad_name, 
-                      const QuadManifold& quad,
-                      const TrajData &data,
-                      const double start_yaw,
-                      const std::string& name = "MincoSnap Trajectory");
+  MincoSnapTrajectory(const std::string quad_name, const QuadManifold &quad,
+                      const TrajData &data, const double start_yaw,
+                      const std::string &name = "MincoSnap Trajectory");
 
   MincoSnapTrajectory() = default;
 
@@ -112,15 +112,23 @@ struct MincoSnapTrajectory {
 
   bool saveSegments(const std::string &filename, const int piecesPerSegment);
 
-  bool saveSegments(const std::string &filename, const std::vector<std::pair<int, int>>& segments);
+  bool saveSegments(const std::string &filename,
+                    const std::vector<std::pair<int, int>> &segments);
+
+  bool saveSegments(const std::string &filename,
+                    const std::vector<std::pair<int, int>> &segments,
+                    const std::vector<Eigen::Vector3d> &gate_centers,
+                    const std::vector<Eigen::Vector3d> &gate_orients);
 
   bool saveAllWaypoints(const std::string &filename);
 
   inline double getTotalDuration() const { return polys.getTotalDuration(); }
 
-  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01, const bool forward_heading = false); 
+  TrajExtremum getSetpointVec(const double sampleTimeSecond = 0.01,
+                              const bool forward_heading = false);
 
-  bool getSetpointVecByDist(const double sampleDistMeter = 0.1, const bool forward_heading = false);
+  bool getSetpointVecByDist(const double sampleDistMeter = 0.1,
+                            const bool forward_heading = false);
 
   std::string name;
   std::string quad_name;
@@ -145,8 +153,8 @@ struct MincoSnapTrajectory {
 
   double horizon{0.1};
 
-
-  friend std::ostream &operator<<(std::ostream &os, const MincoSnapTrajectory &traj);
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const MincoSnapTrajectory &traj);
 };
 
 } // namespace drolib

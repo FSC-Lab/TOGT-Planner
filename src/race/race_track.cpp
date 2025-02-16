@@ -246,6 +246,9 @@ bool RaceTrack::load(const Yaml &yaml) {
   }
 
   gates.clear();
+  gate_orients.clear();
+  gate_centers.clear();
+
   // gates.resize(orders.size());
   Yaml gateYaml;
   std::string type;
@@ -259,6 +262,9 @@ bool RaceTrack::load(const Yaml &yaml) {
 
     // Add a new gate
     gates.push_back(createCorridor.at(type)(gateYaml, order));
+
+    gate_orients.push_back(gates.back()->getRotationEulerRPY());
+    gate_centers.push_back(gates.back()->getCenter());
   }
 
   return true;

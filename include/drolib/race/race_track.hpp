@@ -118,6 +118,8 @@ public:
   std::vector<std::shared_ptr<CorridorBase>> gates;
   std::vector<std::shared_ptr<CorridorBase>> corridors;
   std::vector<std::pair<int, int>> segments;
+  std::vector<Eigen::Vector3d> gate_orients;
+  std::vector<Eigen::Vector3d> gate_centers;
   QuadState initState;
   QuadState endState;
   double minCorDist{0.0};

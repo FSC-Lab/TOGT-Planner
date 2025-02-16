@@ -28,6 +28,12 @@ class CorridorBase {
 
   virtual void write(std::ofstream& os) {}
 
+  virtual Eigen::Vector3d getCenter() { return Eigen::Vector3d::Zero(); }
+
+  virtual Eigen::Quaterniond getOrientation() { return Eigen::Quaterniond::Identity(); }
+
+  virtual Eigen::Vector3d getRotationEulerRPY() { return Eigen::Vector3d::Zero(); }
+
   inline bool empty() const { return corridor.empty(); }
 
   inline int size() const { return corridor.size(); }

@@ -19,6 +19,24 @@ public:
 
   PrismaCorridor(const std::string shape, const Yaml& yaml, const std::string& order = "");
   
+  Eigen::Vector3d getCenter() override { 
+    const Polygon &in = dynamic_cast<const Polygon &>(*corridor.front().shape.get());
+    const Polygon &out = dynamic_cast<const Polygon &>(*corridor.back().shape.get());
+    Eigen::Vector3d position = (in.position+ out.position) * 0.5;
+    return position;
+  }
+
+  Eigen::Quaterniond getOrientation() override { 
+    const Polygon &in = dynamic_cast<const Polygon &>(*corridor.front().shape.get());
+    return in.R_wb;
+  }
+  
+  Eigen::Vector3d getRotationEulerRPY() override { 
+    const Polygon &in = dynamic_cast<const Polygon &>(*corridor.front().shape.get());
+    Eigen::Vector3d rpy = rad2deg(quaternionToEulerAnglesRPY(in.R_wb));
+    return rpy;
+  }
+
   void write(std::ofstream& os) override {
     const Polygon &in = dynamic_cast<const Polygon &>(*corridor.front().shape.get());
     const Polygon &out = dynamic_cast<const Polygon &>(*corridor.back().shape.get());

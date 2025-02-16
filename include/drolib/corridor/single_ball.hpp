@@ -11,6 +11,11 @@ public:
 
   SingleBall(const Yaml& yaml, const std::string& order = "");
 
+  Eigen::Vector3d getCenter() override { 
+    const Ball &ball = dynamic_cast<const Ball &>(*corridor.front().shape);
+    return ball.position;
+  }
+
   void write(std::ofstream& os) override {
     const Ball &ball = dynamic_cast<const Ball &>(*corridor.front().shape);
     os.precision(4);
