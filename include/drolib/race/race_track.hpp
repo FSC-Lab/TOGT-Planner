@@ -115,7 +115,11 @@ public:
 
 public:
   std::string name;
+
+  // A gate contains all polytopes that characterizes a gate
   std::vector<std::shared_ptr<CorridorBase>> gates;
+
+  // A corridor is the region between gates, typically as free space
   std::vector<std::shared_ptr<CorridorBase>> corridors;
   std::vector<std::pair<int, int>> segments;
   std::vector<Eigen::Vector3d> gate_orients;

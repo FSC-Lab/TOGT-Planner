@@ -7,6 +7,10 @@
 #include "drolib/planner/waypoint.hpp"
 #include "drolib/polynomial/piecewise_polynomial.hpp"
 
+#include "drolib/base/corridor_base.hpp"
+#include "drolib/corridor/prisma_corridor.hpp"
+#include "drolib/corridor/single_ball.hpp"
+
 namespace drolib {
 
 struct TrajData {
@@ -23,10 +27,11 @@ struct TrajData {
 
   bool valid() const;
 
+  void setGates(std::vector<std::shared_ptr<CorridorBase>> gate_from_track) { gates = gate_from_track; }
+
   TrajData& operator=(const TrajData& other);
 
   inline int getNumPoints() const { return waypoints.size(); }
-
 
   inline void clear() {
     totalPieces = 0;
@@ -49,6 +54,7 @@ struct TrajData {
   
   bool calcInitialVal();
 
+  std::vector<std::shared_ptr<CorridorBase>> gates;
   std::deque<Waypoint> waypoints;
   int totalPieces{0};
   int spatialVarDim{0};

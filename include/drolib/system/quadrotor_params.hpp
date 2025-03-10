@@ -22,18 +22,18 @@ class QuadParams : public ParameterBase {
     q_bc = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-60, 0, -90)));
     gate_orient = eulerAnglesRPYToQuaternion(deg2rad(Eigen::Vector3d(-90, 0, -90)));
 
-    std::cout << "q_bc: " << q_bc.coeffs().transpose() << std::endl;
-    std::cout << "gate_orient: " << gate_orient.coeffs().transpose() << std::endl;
+    // std::cout << "q_bc: " << q_bc.coeffs().transpose() << std::endl;
+    // std::cout << "gate_orient: " << gate_orient.coeffs().transpose() << std::endl;
 
     const Eigen::Quaterniond q_wb{Eigen::Quaterniond::Identity()};
     const Eigen::Quaterniond q_wc = q_wb * q_bc;
     const Eigen::Vector3d z_c = q_wc.toRotationMatrix().col(2);
     const Eigen::Vector3d z_g = gate_orient.toRotationMatrix().col(2);
-    std::cout << "z_c: " << z_c.transpose() << std::endl;
-    std::cout << "z_g: " << z_g.transpose() << std::endl;
+    // std::cout << "z_c: " << z_c.transpose() << std::endl;
+    // std::cout << "z_g: " << z_g.transpose() << std::endl;
 
     double cost = 1.0 - z_c.dot(z_g);
-    std::cout << "cost: " << cost << std::endl;
+    // std::cout << "cost: " << cost << std::endl;
 
   }
 

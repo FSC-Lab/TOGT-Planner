@@ -7,6 +7,7 @@ bool TrajSolver::setInitialGuess(const TrajData &tdata) {
     return false;
   }
   data = tdata;
+  data.setGates(tdata.gates);
   return true;
 }
 
@@ -90,7 +91,8 @@ double TrajSolver::costFunction(void *ptr, const Eigen::VectorXd &x,
   obj->minco.setParameters(obj->data.P, obj->data.T);
 
   cost += addEnergyCost(obj->minco, obj->tparams, obj->data.partialGradByCoeffs, obj->data.partialGradByTimes);
-  cost += addPenaltyCost(obj->data.T, obj->minco.getCoeffs(), obj->quad, obj->yawTilt.get(), obj->tparams, obj->data.partialGradByCoeffs, obj->data.partialGradByTimes);
+  // cost += addPenaltyCost(obj->data.T, obj->minco.getCoeffs(), obj->quad, obj->yawTilt.get(), obj->tparams, obj->data.partialGradByCoeffs, obj->data.partialGradByTimes);
+  cost += addPenaltyCostWithGates(obj->data.gates, obj->data.T, obj->minco.getCoeffs(), obj->quad, obj->yawTilt.get(), obj->tparams, obj->data.partialGradByCoeffs, obj->data.partialGradByTimes);
 
   obj->minco.propagateGrad(obj->data.partialGradByCoeffs, obj->data.partialGradByTimes, obj->data.gradByPoints, obj->data.gradByTimes);
 
@@ -218,6 +220,103 @@ double TrajSolver::addRobustPenaltyCost(const Eigen::VectorXd &T,
 
   return cost;                         
 }
+
+
+double TrajSolver::addPenaltyCostWithGates(
+                                    std::vector<std::shared_ptr<CorridorBase>> gates,
+                                    const Eigen::VectorXd &T,
+                                    const Eigen::MatrixX3d &coeffs,
+                                    const QuadManifold &quad,
+                                    AngleBase* yawTilt,
+                                    const TrajParams &params,       
+                                    Eigen::MatrixX3d &gradC,
+                                    Eigen::VectorXd &gradT) {
+  double cost{0.0};
+  double step, alpha;
+  double node, penalty;
+  Eigen::Matrix<double, NUM_COEFF, 6> beta;
+  Eigen::Vector3d pos, vel, acc, jer, sna, cra;
+  Eigen::Vector3d yaw;
+  PVAJS3D pvajs;
+  Setpoint setpoint;
+
+  Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc;
+  Eigen::Vector3d totalGradJer, totalGradSna, totalGradCra;
+  Eigen::Vector3d totalGradHeading;
+  Eigen::Vector3d gradPos;
+  Eigen::Vector3d gradVel;
+  Eigen::Vector3d gradOmg;
+  Eigen::Vector4d gradQuat;
+  Eigen::Vector4d gradThrusts;
+
+  const int pieceNum = T.size();
+  int numCheckPerPiece = params.numConstPena;
+
+  for (int i = 0; i < pieceNum; i++) {
+    const Eigen::Matrix<double, NUM_COEFF, PATH_DIM> &c = coeffs.block<NUM_COEFF, PATH_DIM>(i * NUM_COEFF, 0);
+    // if (T(i) <= params.checkTimeSec) {
+    //   continue;
+    // }
+    if (params.dynamicConstCheck) {
+      numCheckPerPiece = T(i) / params.checkTimeSec;
+      numCheckPerPiece = numCheckPerPiece <= params.maxNumCheck ? numCheckPerPiece : params.maxNumCheck;
+      numCheckPerPiece = numCheckPerPiece < params.minNumCheck ? params.minNumCheck : numCheckPerPiece;
+    }
+
+    const double integralFrac = 1.0f / numCheckPerPiece;
+    step = T(i) * integralFrac;
+    for (int j = 0; j <= numCheckPerPiece; j++) {
+      computeBeta(j * step, beta);
+      pos = c.transpose() * beta.col(0);
+      vel = c.transpose() * beta.col(1);
+      acc = c.transpose() * beta.col(2);
+      jer = c.transpose() * beta.col(3);
+      sna = c.transpose() * beta.col(4);
+      cra = c.transpose() * beta.col(5);
+
+      //TODO: compute yaw angle from another polynomial
+      yaw = yawTilt->at(j * step);
+
+      pvajs << pos, vel, acc, jer, sna;
+      penalty = 0.0;
+
+      /***********************************************/
+      // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      // penalty += quad.computePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      // penalty += quad.computePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+      /***********************************************/
+      // penalty += quad.computeSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+     
+      // penalty += quad.computeSimplePenalityCostAD(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna, totalGradHeading);
+
+      /***********************************************/
+      // penalty += quad.computeRobustSimplePenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      /***********************************************/
+      // std::cout << "gates.size(): " << gates.size() << std::endl;
+      penalty += quad.computeRobustPenalityCostWithGates(gates, pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      // penalty += quad.computeRobustPenalityCost(pvajs, yaw, params, totalGradPos, totalGradVel, totalGradAcc, totalGradJer, totalGradSna);
+      /***********************************************/
+      node = (j == 0 || j == numCheckPerPiece) ? 0.5 : 1.0;
+      alpha = j * integralFrac;
+
+      gradC.block<NUM_COEFF, PATH_DIM>(i * NUM_COEFF, 0) +=
+          (beta.col(0) * totalGradPos.transpose() +
+           beta.col(1) * totalGradVel.transpose() +
+            beta.col(2) * totalGradAcc.transpose() +
+            beta.col(3) * totalGradJer.transpose() +
+            beta.col(4) * totalGradSna.transpose()) * step * node;
+
+      gradT(i) += (totalGradPos.dot(vel) + totalGradVel.dot(acc) +
+                    totalGradAcc.dot(jer) + totalGradJer.dot(sna) +
+                    totalGradSna.dot(cra)) * step * node * alpha + node * integralFrac * penalty;
+
+      cost += node * step * penalty;
+    }
+  }
+
+  return cost;
+}
+
 
 double TrajSolver::addPenaltyCost(const Eigen::VectorXd &T,
                                     const Eigen::MatrixX3d &coeffs,

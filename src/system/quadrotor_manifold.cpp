@@ -632,6 +632,235 @@ double QuadManifold::computeRobustSimplePenalityCost(
   return cost;
 }
 
+double QuadManifold::computeRobustPenalityCostWithGates(
+    std::vector<std::shared_ptr<CorridorBase>> gates,
+    const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+    Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
+    Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
+    Eigen::Vector3d &gradTotalSna) const {
+
+/*********Compute quadrotor full states*********/
+  double omg_xy_sqr{0.0}, omg_z_sqr{0.0}, thrust{0.0};
+  Eigen::Vector3d pos = pvajs.col(0);
+  Eigen::Vector3d vel = pvajs.col(1);  
+  Eigen::Vector3d acc = pvajs.col(2);
+  Eigen::Vector3d jer = pvajs.col(3);
+  Eigen::Vector3d sna = pvajs.col(4);
+  
+  a0 = acc(0);
+  a1 = acc(1);
+  a2 = acc(2);
+  j0 = jer(0);
+  j1 = jer(1);
+  j2 = jer(2);
+  s0 = sna(0);
+  s1 = sna(1);
+  s2 = sna(2);
+  const double psi = yaw(0);
+  const double dpsi = yaw(1);
+  const double ddpsi = yaw(2);
+
+  c_half_psi = cos(0.5 * psi);
+  s_half_psi = sin(0.5 * psi);
+  c_psi = cos(psi);
+  s_psi = sin(psi);
+
+  // alpha = a + gzW
+  alpha0 = a0;
+  alpha1 = a1;
+  alpha2 = a2 + G;
+  alpha << alpha0, alpha1, alpha2;
+
+  alpha_sqr0 = alpha0 * alpha0;
+  alpha_sqr1 = alpha1 * alpha1;
+  alpha_sqr2 = alpha2 * alpha2;
+  alpha_norm_2 = alpha_sqr0 + alpha_sqr1 + alpha_sqr2;
+  alpha_norm_1 = sqrt(alpha_norm_2);
+  alpha_norm_3 = alpha_norm_2 * alpha_norm_1;
+  alpha_norm_5 = alpha_norm_2 * alpha_norm_3;
+  alpha_norm_7 = alpha_norm_2 * alpha_norm_5;
+  alpha_dot_j = alpha0 * j0 + alpha1 * j1 + alpha2 * j2;
+  alpha_dot_j_sqr = alpha_dot_j * alpha_dot_j;
+  alpha_dot_s = alpha0 * s0 + alpha1 * s1 + alpha2 * s2;
+  j_norm_2 = j0 * j0 + j1 * j1 + j2 * j2;
+
+  mat_DNalphas_a = -sna * alpha.transpose() / alpha_norm_3 - (alpha * sna.transpose() + I33 * alpha_dot_s) / alpha_norm_3 + alpha * alpha.transpose() * 3 * alpha_dot_s / alpha_norm_5;
+
+  // zB = N(a+gzW)
+  zB0 = alpha0 / alpha_norm_1;
+  zB1 = alpha1 / alpha_norm_1;
+  zB2 = alpha2 / alpha_norm_1;
+  zB << zB0, zB1, zB2;
+
+  thrust = zB0 * quad_params_.mass * a0 
+                    + zB1 * quad_params_.mass * a1
+                    + zB2 * quad_params_.mass * (a2 + G);
+  zB2_1 = zB2 + 1;
+
+  if (fabs(zB2_1) > 0.001) {
+    alpha01 = alpha0 * alpha1;
+    alpha12 = alpha1 * alpha2;
+    alpha02 = alpha0 * alpha2;
+
+    ng00 = (alpha_sqr1 + alpha_sqr2) / alpha_norm_3;
+    ng01 = -alpha01 / alpha_norm_3;
+    ng02 = -alpha02 / alpha_norm_3;
+    ng11 = (alpha_sqr0 + alpha_sqr2) / alpha_norm_3;
+    ng12 = -alpha12 / alpha_norm_3;
+    ng22 = (alpha_sqr0 + alpha_sqr1) / alpha_norm_3;
+
+    DN_alpha << ng00, ng01, ng02, ng01, ng11, ng12, ng02, ng12, ng22;
+
+    // dzB
+    dzB = DN_alpha * jer;
+    dzB0 = dzB(0);
+    dzB1 = dzB(1);
+    dzB2 = dzB(2);
+    dzB2_sqr = dzB2 * dzB2;
+
+    // ddzB
+    DN_alpha_s = DN_alpha * sna;
+    ddzB = -jer * 2.0 * alpha_dot_j / alpha_norm_3 - alpha * j_norm_2 / alpha_norm_3 + alpha * 3.0 * alpha_dot_j_sqr / alpha_norm_5 + DN_alpha_s;
+    ddzB0 = ddzB(0);
+    ddzB1 = ddzB(1);
+    ddzB2 = ddzB(2);
+
+    mat_zB_a = DN_alpha;
+    mat_dzB_j = DN_alpha;
+    mat_ddzB_s = DN_alpha;
+
+    mat_dzB_a = -jer * alpha.transpose() / alpha_norm_3 - (alpha * jer.transpose() + I33 * alpha_dot_j) / alpha_norm_3 + alpha * alpha.transpose() * 3 * alpha_dot_j / alpha_norm_5;
+    mat_ddzB_j = -(jer * alpha.transpose() + alpha * jer.transpose() + I33 * alpha_dot_j) * 2 / alpha_norm_3 + alpha * alpha.transpose() * 6 * alpha_dot_j / alpha_norm_5;
+    mat_ddzB_a = -(I33 * j_norm_2 + jer * jer.transpose() * 2.0) / alpha_norm_3 + ((jer * alpha.transpose() + alpha * jer.transpose()) * 6 * alpha_dot_j + alpha * alpha.transpose() * 3 * j_norm_2 + I33 * 3 * alpha_dot_j_sqr) / alpha_norm_5 - (alpha * alpha.transpose() * 15 * alpha_dot_j_sqr) / alpha_norm_7 + mat_DNalphas_a;
+
+    // quaternion
+    tilt_den_2 = 2.0 * (zB2_1);
+    tilt_den = sqrt(tilt_den_2);
+    tilt_den_3 = tilt_den_2 * tilt_den;
+
+    tilt0 = 0.5 * tilt_den;
+    tilt1 = -zB1 / tilt_den;
+    tilt2 = zB0 / tilt_den;
+
+    quat_tmp(0) = tilt0 * c_half_psi;
+    quat_tmp(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
+    quat_tmp(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
+    quat_tmp(3) = tilt0 * s_half_psi;
+
+    // bodyrate
+    omg_den = zB2_1;
+    omg_den_2 = omg_den * omg_den;
+    omg_den_4 = omg_den_2 * omg_den_2;
+
+    omg_term = dzB2 / omg_den;
+    tmp_omg_1 = zB0 * s_psi - zB1 * c_psi;
+    tmp_omg_2 = zB0 * c_psi + zB1 * s_psi;
+    tmp_omg_3 = zB1 * dzB0 - zB0 * dzB1;
+
+    omg_tmp(0) = dzB0 * s_psi - dzB1 * c_psi - tmp_omg_1 * omg_term;
+    omg_tmp(1) = dzB0 * c_psi + dzB1 * s_psi - tmp_omg_2 * omg_term;
+    omg_tmp(2) = tmp_omg_3 / omg_den + dpsi;
+
+    // derivative of torque w.r.t. omg
+    mat_tor_w << 0.0, inertiaGapZY * omg_tmp(2), inertiaGapZY * omg_tmp(1),
+                  inertiaGapXZ * omg_tmp(2), 0.0, inertiaGapXZ * omg_tmp(0),
+                  inertiaGapYX * omg_tmp(1), inertiaGapYX * omg_tmp(0), 0.0;
+
+    // body acceleration
+    tmp_omg_4 = dzB0 * s_psi - dzB1 * c_psi;
+    tmp_omg_5 = dzB0 * c_psi + dzB1 * s_psi;
+    tmp_omg_6 = zB1 * ddzB0 - zB0 * ddzB1;
+
+    omg_dot(0) = ddzB0 * s_psi - ddzB1 * c_psi - ddzB2 * tmp_omg_1 / omg_den - dzB2 * tmp_omg_4 / omg_den + dzB2 * dzB2 * tmp_omg_1 / omg_den_2;
+    omg_dot(1) = ddzB0 * c_psi + ddzB1 * s_psi - ddzB2 * tmp_omg_2 / omg_den - dzB2 * tmp_omg_5 / omg_den + dzB2 * dzB2 * tmp_omg_2 / omg_den_2;
+    omg_dot(2) = tmp_omg_6 / omg_den - tmp_omg_3 * dzB2 / omg_den_2 + ddpsi;
+
+    //TODO: the correct expression leads to a worse result...
+    tau_tmp(0) = quad_params_.inertia.x() * omg_dot(0) + inertiaGapZY * omg_tmp(1) * omg_tmp(2);
+    tau_tmp(1) = quad_params_.inertia.y() * omg_dot(1) + inertiaGapXZ * omg_tmp(0) * omg_tmp(2);
+    tau_tmp(2) = quad_params_.inertia.z() * omg_dot(2) + inertiaGapYX * omg_tmp(0) * omg_tmp(1);
+    // tau_tmp.setZero(); //TODO: in this case, the collective thrust is constrained indeed
+
+    thrusts_tmp = quad_params_.T_mb * (Eigen::Vector4d() << thrust, tau_tmp).finished();
+
+  } else {
+
+    double c = thrust / quad_params_.mass;
+    double c_inv = 1.0 / c;
+    double c_inv_2 = c_inv * c_inv;
+
+    omg_xy_sqr = c_inv_2 * (j0 * j0 + j1 * j1);
+  }
+
+  
+/*********Compute costs and their gradients*********/
+  gradTotalPos.setZero();
+  gradTotalVel.setZero();
+  gradTotalAcc.setZero();
+  gradTotalJer.setZero();
+  gradTotalSna.setZero();
+
+  double cost{0.0};
+  if (fabs(zB2_1) > 0.001) {
+    Eigen::Vector3d gradPos = Eigen::Vector3d::Zero();
+    Eigen::Vector3d gradVel = Eigen::Vector3d::Zero();
+    Eigen::Vector3d gradOmg = Eigen::Vector3d::Zero();
+    Eigen::Vector4d gradQuat = Eigen::Vector4d::Zero();
+    Eigen::Vector4d gradThrusts = Eigen::Vector4d::Zero();
+
+    cost += addVelocityPenalities(vel, params, gradVel);
+    cost += addRotationPenalities(quat_tmp, params, gradQuat);
+    cost += addBodyratePenalities(omg_tmp, params, gradOmg);
+    cost += addThrustsPenalities(thrusts_tmp, params, gradThrusts);
+    // cost += addBoundaryPenalities(pos, params, gradPos);
+    // cost += addCollisionPenalities(pos, params, gradPos);
+    cost += addGateCollisionPenalities(gates, pos, params, gradPos);
+
+    backPropagate(gradPos, gradVel, gradQuat, gradOmg,
+                            gradThrusts, gradTotalPos, gradTotalVel,
+                            gradTotalAcc, gradTotalJer, gradTotalSna);
+
+  } else {
+    // std::cout << "Singularity Handling!";
+    double gradOmgXYSqr{0.0};
+    // double gradOmgZSqr;
+    double gradThrust{0.0};
+    // gradOmgXYSqr = 0.0;
+    // gradOmgZSqr = 0.0;
+    // gradThrust = 0.0;
+    
+    double vio, vPena, vPenaD;
+    //Cost 1: omg_xy_sqr
+    vio = omg_xy_sqr - params.maxOmgXYSqr;
+    if (smoothedL1(vio, params.smoothingEps, vPena, vPenaD)) {
+      gradOmgXYSqr += params.weightOmg * vPenaD;
+      cost += params.weightOmg * vPena;
+    }
+
+    cost += addThrustPenality(thrust, params, gradThrust);
+
+    //Cost 1
+    double c = thrust / quad_params_.mass;
+    double c_inv = 1.0 / c;
+    double c_inv_2 = c_inv * c_inv;
+    double c_inv_3 = c_inv_2 * c_inv;
+
+    Eigen::Vector3d d_Cwxysqr_j = c_inv_2 * 2.0 * Eigen::Vector3d(j0, j1, 0.0);
+    double d_Cwxysqr_c = - 2.0 * c_inv_3 * (j0 * j0 + j1 * j1);
+    Eigen::Vector3d d_c_a = zB;
+    Eigen::Vector3d d_Cwxysqr_a = d_c_a * d_Cwxysqr_c;
+    //Cost 3
+    d_Cf_a = gradThrust * quad_params_.mass * zB.transpose();
+    
+    gradTotalAcc = d_Cwxysqr_a + d_Cf_a;
+    gradTotalJer = d_Cwxysqr_j;
+  }
+
+
+  return cost;
+}
+
+
 double QuadManifold::computeRobustPenalityCost(
     const PVAJS3D &pvajs, const Eigen::Vector3d& yaw, const TrajParams &params,
     Eigen::Vector3d &gradTotalPos,
@@ -811,7 +1040,8 @@ double QuadManifold::computeRobustPenalityCost(
     cost += addRotationPenalities(quat_tmp, params, gradQuat);
     cost += addBodyratePenalities(omg_tmp, params, gradOmg);
     cost += addThrustsPenalities(thrusts_tmp, params, gradThrusts);
-    cost += addBoundaryPenalities(pos, params, gradPos);
+    // cost += addBoundaryPenalities(pos, params, gradPos);
+    // cost += addCollisionPenalities(pos, params, gradPos);
 
     backPropagate(gradPos, gradVel, gradQuat, gradOmg,
                             gradThrusts, gradTotalPos, gradTotalVel,
@@ -1020,6 +1250,127 @@ double QuadManifold::addRotationPenalities(const Eigen::Vector4d &quat,
   if (smoothedL1(v, params.smoothingEps, vPena, vPenaD)) {
     gradQuat += params.weightRot * vPenaD /  sqrt(1.0 - cosAng * cosAng) * 4.0 * Eigen::Vector4d(0.0, quat(1), quat(2), 0.0);
     penalty += params.weightRot * vPena;
+  }
+
+  return penalty;
+}
+
+
+// double gate_sdf(const Eigen::Vector3d& relative_pos, Eigen::Vector3d& grad) {
+//     double x = relative_pos.x(), y = relative_pos.y(), z = relative_pos.z();
+//     double v0=fabs(x), v1=fabs(y), v2=fmax(v0,v1), v3=v2-1.05f, v4=fabs(v3), v5=v4-0.3f, v6=fabs(z), v7=v6-0.15f, v8=fmax(v5,v7), v9=x>0.0f?1.0f:x<0.0f?-1.0f:0.0f, v10=y>0.0f?1.0f:y<0.0f?-1.0f:0.0f, v11=v0-v1, v12=v11>0.0f?v0:v1, v13=v12-v1, v14=v13>0.0f?v9:0.0f, v15=v3>0.0f?1.0f:v3<0.0f?-1.0f:0.0f, v16=v14*v15, v17=z>0.0f?1.0f:z<0.0f?-1.0f:0.0f, v18=v5-v7, v19=v18>0.0f?v5:v7, v20=v19-v7, v21=v20>0.0f?v16:0.0f, v22=v13>0.0f?0.0f:v10, v23=v22*v15, v24=v20>0.0f?v23:0.0f, v25=v20>0.0f?0.0f:v17;
+//     grad = Eigen::Vector3d(v21, v24, v25);
+//     return v8;
+// }
+
+double gate_sdf(const Eigen::Vector3d& relative_pos, Eigen::Vector3d& gradRelativePos) {
+    double x = relative_pos.x(), y = relative_pos.y(), z = relative_pos.z();
+    // s1: 5, s2: 1
+    double v0=fabs(x), v1=fabs(y), v2=fmax(v0,v1), v3=v2-1.5f, v4=fabs(v3), v5=v4-1.0f, v6=fabs(z), v7=v6-1.0f, v8=fmax(v5,v7), v9=x>0.0f?1.0f:x<0.0f?-1.0f:0.0f, v10=y>0.0f?1.0f:y<0.0f?-1.0f:0.0f, v11=v0-v1, v12=v11>0.0f?v0:v1, v13=v12-v1, v14=v13>0.0f?v9:0.0f, v15=v3>0.0f?1.0f:v3<0.0f?-1.0f:0.0f, v16=v14*v15, v17=z>0.0f?1.0f:z<0.0f?-1.0f:0.0f, v18=v5-v7, v19=v18>0.0f?v5:v7, v20=v19-v7, v21=v20>0.0f?v16:0.0f, v22=v13>0.0f?0.0f:v10, v23=v22*v15, v24=v20>0.0f?v23:0.0f, v25=v20>0.0f?0.0f:v17;
+    
+    // s1: 5, s2: 2
+    // double v0=fabs(x), v1=fabs(y), v2=fmax(v0,v1), v3=v2-1.75f, v4=fabs(v3), v5=v4-0.75f, v6=fabs(z), v7=v6-1.0f, v8=fmax(v5,v7), v9=x>0.0f?1.0f:x<0.0f?-1.0f:0.0f, v10=y>0.0f?1.0f:y<0.0f?-1.0f:0.0f, v11=v0-v1, v12=v11>0.0f?v0:v1, v13=v12-v1, v14=v13>0.0f?v9:0.0f, v15=v3>0.0f?1.0f:v3<0.0f?-1.0f:0.0f, v16=v14*v15, v17=z>0.0f?1.0f:z<0.0f?-1.0f:0.0f, v18=v5-v7, v19=v18>0.0f?v5:v7, v20=v19-v7, v21=v20>0.0f?v16:0.0f, v22=v13>0.0f?0.0f:v10, v23=v22*v15, v24=v20>0.0f?v23:0.0f, v25=v20>0.0f?0.0f:v17;
+    gradRelativePos << v21, v24, v25;
+    
+    return v8;
+}
+
+
+double QuadManifold::addGateCollisionPenalities(
+      std::vector<std::shared_ptr<CorridorBase>> gates,
+      const Eigen::Vector3d &pos, 
+      const TrajParams &params,
+      Eigen::Ref<Eigen::Vector3d> gradPos) const {
+  // std::cout << "gates: " << gates.size() << std::endl;
+  double penalty{0.0};
+  gradPos.setZero();
+
+  if (params.weightPos <= 1.0e-6) {
+    return penalty;
+  }  
+
+  // TODO(chao): loop through all gates and check the distance
+  double v, vPena, vPenaD;
+  double distance{0};
+  Eigen::Vector3d gradDistanceToPos{Eigen::Vector3d::Zero()};
+
+  const double distance_threshold = 0.2;
+  for (int i{0}; i < gates.size(); ++i) {
+
+    // if (i == 2) {
+      // distance = gates[i]->calcWallDistance(pos, gradDistanceToPos);
+    // } else {
+    distance = gates[i]->calcDistance(pos, gradDistanceToPos);
+    // }
+    // std::cout << "distance: " << distance << std::endl;
+    // distance = distance_threshold;
+
+    // Minimum boundary
+    v = distance_threshold - distance;
+
+    // if (v > 0.0) {
+    //   std::cout << "Gate " << i << ", distance: " << distance << std::endl;
+    // }
+
+    if (smoothedL1(v, params.smoothingEps, vPena, vPenaD)) {
+      gradPos += params.weightPos * vPenaD * (-gradDistanceToPos);
+      penalty += params.weightPos * vPena;
+    }
+  }
+                  
+  // const Eigen::Vector3d p_w_gw(5.0, 0.0, 2.5);
+  // const Eigen::Quaterniond q_wg = quaternionAtUnitY(-M_PI/2);
+
+  // Eigen::Vector3d relative_pos = q_wg.inverse() * (pos - p_w_gw);
+
+  // Eigen::Vector3d gradRelativePos{Eigen::Vector3d::Zero()};
+  // double distance = gate_sdf(relative_pos, gradRelativePos);
+  // // std::cout << "distance: " << distance << std::endl;
+
+  // double v, vPena, vPenaD;
+  // // Minimum boundary
+  // v = 0.0 - distance;
+  // if (smoothedL1(v, params.smoothingEps, vPena, vPenaD)) {
+  //   gradPos += params.weightPos * vPenaD * (-(q_wg.toRotationMatrix() * gradRelativePos));
+  //   penalty += params.weightPos * vPena;
+  // }
+  
+  // if (penalty > 1e-6) {
+  //   std::cout << "penality: " << penalty << ", distance: " << distance << std::endl;
+  // }
+
+  return penalty;
+}
+
+double QuadManifold::addCollisionPenalities(const Eigen::Vector3d &pos, 
+                                            const TrajParams &params,
+                                            Eigen::Ref<Eigen::Vector3d> gradPos) const {
+  double penalty{0.0};
+  gradPos.setZero();
+
+  if (params.weightPos <= 1.0e-6) {
+    return penalty;
+  }                                 
+
+  const Eigen::Vector3d p_w_gw(5.0, 0.0, 2.5);
+  const Eigen::Quaterniond q_wg = quaternionAtUnitY(-M_PI/2);
+
+  Eigen::Vector3d relative_pos = q_wg.inverse() * (pos - p_w_gw);
+
+  Eigen::Vector3d gradRelativePos{Eigen::Vector3d::Zero()};
+  double distance = gate_sdf(relative_pos, gradRelativePos);
+  // std::cout << "distance: " << distance << std::endl;
+
+  double v, vPena, vPenaD;
+  // Minimum boundary
+  v = 0.0 - distance;
+  if (smoothedL1(v, params.smoothingEps, vPena, vPenaD)) {
+    gradPos += params.weightPos * vPenaD * (-(q_wg.toRotationMatrix() * gradRelativePos));
+    penalty += params.weightPos * vPena;
+  }
+  
+  if (penalty > 1e-6) {
+    std::cout << "penality: " << penalty << ", distance: " << distance << std::endl;
   }
 
   return penalty;

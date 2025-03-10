@@ -10,6 +10,10 @@
 #include <cmath>
 #include <limits>
 
+#include "drolib/base/corridor_base.hpp"
+#include "drolib/corridor/prisma_corridor.hpp"
+#include "drolib/corridor/single_ball.hpp"
+
 #include <casadi/casadi.hpp>
 #include <casadi/core/casadi_misc.hpp>
 
@@ -117,6 +121,13 @@ public:
       Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
       Eigen::Vector3d &gradTotalSna) const;
 
+  double computeRobustPenalityCostWithGates(
+      std::vector<std::shared_ptr<CorridorBase>> gates,
+      const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
+      Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
+      Eigen::Vector3d &gradTotalAcc, Eigen::Vector3d &gradTotalJer,
+      Eigen::Vector3d &gradTotalSna) const;
+
   double computeRobustSimplePenalityCost(
       const PVAJS3D &pvajs, const Eigen::Vector3d &yaw, const TrajParams &params,
       Eigen::Vector3d &gradTotalPos, Eigen::Vector3d &gradTotalVel,
@@ -155,6 +166,16 @@ public:
   double addBoundaryPenalities(const Eigen::Vector3d &pos,
                                const TrajParams &params,
                                Eigen::Ref<Eigen::Vector3d> gradPos) const;
+
+  double addCollisionPenalities(const Eigen::Vector3d &pos,
+                               const TrajParams &params,
+                               Eigen::Ref<Eigen::Vector3d> gradPos) const;
+
+  double addGateCollisionPenalities(
+        std::vector<std::shared_ptr<CorridorBase>> gates,
+        const Eigen::Vector3d &pos, 
+        const TrajParams &params,
+        Eigen::Ref<Eigen::Vector3d> gradPos) const;
 
   bool smoothedL1(const double &x, const double &mu, double &f,
                   double &df) const;

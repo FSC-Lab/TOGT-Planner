@@ -70,6 +70,15 @@ class TrajSolver {
                                const TrajParams &params,  
                                Eigen::MatrixX3d &gradC, Eigen::VectorXd &gradT);
 
+  static double addPenaltyCostWithGates(
+                               std::vector<std::shared_ptr<CorridorBase>> gates,
+                               const Eigen::VectorXd &T,
+                               const Eigen::MatrixX3d &coeffs,
+                               const QuadManifold &quad,
+                               AngleBase* yawTilt,
+                               const TrajParams &params,  
+                               Eigen::MatrixX3d &gradC, Eigen::VectorXd &gradT);
+
   static double addRobustPenaltyCost(const Eigen::VectorXd &T,
                                      const Eigen::MatrixX3d &coeffs,
                                      const QuadManifold &quad,

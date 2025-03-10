@@ -124,12 +124,15 @@ bool RaceTrack::getData(const TrajData &prev, TrajData &cur) {
 
   cur.calcInitialVal();
 
+  cur.setGates(prev.gates);
+
   return true;
 }
 
 bool RaceTrack::getData(const double speedGuess, TrajData &tdata) {
   assignWaypoints(tdata);
   tdata.initData(initState.p, endState.p, speedGuess);
+  tdata.setGates(gates);
   return true;
 }
 
@@ -289,7 +292,7 @@ void RaceTrack::initCorridors(const int midpoints) {
   for (size_t i{0}; i < gates.size() + 1; ++i) {
     const Eigen::Vector3d &p0 = startPoints[i];
     const Eigen::Vector3d &p1 = endPoints[i];
-    // initCorridor(i, p0, p1, midpoints);
+    // Corridor is region between two consecutive gates    
     corridors.push_back(std::make_shared<FreeCorridor>(p0, p1, midpoints, minCorDist));
   }
 
