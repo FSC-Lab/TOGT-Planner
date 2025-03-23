@@ -29,11 +29,12 @@ bool QuadParams::load(const Yaml& yaml) {
     const double lcb = l * cos(beta * M_PI / 180.0);
     T_bm = (Eigen::Matrix4d() << 
       1.0, 1.0, 1.0, 1.0,
-      -lsb, lsb, -lsb, lsb,
-      -lcb, lcb, lcb, -lcb,
-      -ct, -ct, ct, ct).finished();
+      -lsb, -lsb, lsb, lsb,
+      lcb, -lcb, lcb, -lcb,
+      ct, -ct, -ct, ct).finished();
 
     T_mb = T_bm.inverse();
+
 
   } else if (yaml["T_bm"].isDefined()) {
     yaml["T_bm"] >> T_bm;
