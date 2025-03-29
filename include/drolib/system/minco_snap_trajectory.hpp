@@ -16,6 +16,7 @@ struct TrajExtremum {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   double maxTime{NAN};
   double length{NAN};
+  MinMaxVecRecorder<double, 3> pos;
   MinMaxRecorder<double> vel;
   MinMaxRecorder<double> acc;
   MinMaxRecorder<double> tilt;
@@ -26,6 +27,7 @@ struct TrajExtremum {
 
   inline void reset() {
     maxTime = NAN;
+    pos.reset();
     vel.reset();
     acc.reset();
     tilt.reset();
@@ -41,6 +43,8 @@ struct TrajExtremum {
     // os << std::scientific;
     os << std::fixed;
     os << "TrajExtremum:\n"
+       << "minPos:     " << extremum.pos.min().transpose() << " [m]\n"
+       << "maxPos:     " << extremum.pos.max().transpose() << " [m]\n"
        << "maxVel:     " << extremum.vel.max() << " [m/s]\n"
        << "maxAcc:     " << extremum.acc.max() << " [m^2/s]\n"
        << "maxTilt:    " << rad2deg(extremum.tilt.max()) << " [deg]\n"

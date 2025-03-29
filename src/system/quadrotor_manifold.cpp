@@ -812,7 +812,7 @@ double QuadManifold::computeRobustPenalityCostWithGates(
     cost += addRotationPenalities(quat_tmp, params, gradQuat);
     cost += addBodyratePenalities(omg_tmp, params, gradOmg);
     cost += addThrustsPenalities(thrusts_tmp, params, gradThrusts);
-    // cost += addBoundaryPenalities(pos, params, gradPos);
+    cost += addBoundaryPenalities(pos, params, gradPos);
     // cost += addCollisionPenalities(pos, params, gradPos);
     cost += addGateCollisionPenalities(gates, pos, params, gradPos);
 
@@ -1040,7 +1040,7 @@ double QuadManifold::computeRobustPenalityCost(
     cost += addRotationPenalities(quat_tmp, params, gradQuat);
     cost += addBodyratePenalities(omg_tmp, params, gradOmg);
     cost += addThrustsPenalities(thrusts_tmp, params, gradThrusts);
-    // cost += addBoundaryPenalities(pos, params, gradPos);
+    cost += addBoundaryPenalities(pos, params, gradPos);
     // cost += addCollisionPenalities(pos, params, gradPos);
 
     backPropagate(gradPos, gradVel, gradQuat, gradOmg,

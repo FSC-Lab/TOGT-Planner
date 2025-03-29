@@ -26,6 +26,9 @@ MincoSnapTrajectory::MincoSnapTrajectory(const std::string quad_name,
 // TODO(chao): change here to modify the heading
 TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
                                                  const bool forward_heading) {
+  // const double desired_end_yaw = deg2rad(157);
+  const double desired_end_yaw = deg2rad(35);
+  
   TrajExtremum extremum;
   
   if (!quad.valid()) {
@@ -51,7 +54,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
   extremum.vel.add(0.0);
   extremum.vel.add(polys.getMaxVel());
   extremum.acc.add(polys.getMaxAcc());
-
+  
   double t{0.0};
   double dt{0.0};
   std::vector<double> times;
@@ -91,32 +94,44 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
       // std::cout << "future_pos: " << future_pos.transpose() << ", current: " << pos.transpose() << std::endl;
       const Eigen::Vector3d diff = future_pos - pos;
-      if (diff.head<2>().norm() > 1e-3) {
+      if (diff.head<2>().norm() > 0.001) {
           heading = wrapMinusPiToPi(atan2(diff.y(), diff.x()));
         } else {
-          heading = lastHeading;
+          if ((nSamples - i) < 10) {
+            heading = desired_end_yaw;
+          } else {
+            heading = lastHeading;
+          }
         }
         double yaw_rate = wrapAngleDifference(lastHeading, heading) / sampleTimeSec;
-        yaw << heading, yaw_rate, 0.0;
+
+        if (i == 0) {
+          yaw << deg2rad(35.0), 0.0, 0.0;
+        } else {
+          yaw << heading, 0.0, 0.0;
+        }
         // std::cout << "yaw: " << yaw.transpose() << std::endl;
         lastHeading = heading;
     } else {
       // std::cout << "start_yaw: " << rad2deg(start_yaw) << std::endl;
-      yaw << start_yaw, 0.0, 0.0;
+      yaw << 0.0, 0.0, 0.0;
     }
 
+    // if (i < 20) {
+    //   std::cout << i <<  " yaw: " << rad2deg(yaw).transpose() << ", " << end_yaw << "\n";
+    // }
     // TODO(chao): delete this part
     // rotation_type = RotationType::ROLL_PITCH_YAW;
     // std::cout << "RotationType::ROLL_PITCH_YAW" << std::endl;
     if (rotation_type == RotationType::TILT_HEADING) {
       quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
       const Eigen::Quaterniond curr_quat = setpoint.state.q();
-      double dot_product = prev_quat.dot(curr_quat);
-      if (dot_product < 0.0) {
-        std::cout << "Flip detected!!" << std::endl;
-        setpoint.state.q(Eigen::Quaterniond(-curr_quat.w(), -curr_quat.x(),
-                                            -curr_quat.y(), -curr_quat.z()));
-      }
+      // double dot_product = prev_quat.dot(curr_quat);
+      // if (dot_product < 0.0) {
+      //   std::cout << "Flip detected!!" << std::endl;
+      //   setpoint.state.q(Eigen::Quaterniond(-curr_quat.w(), -curr_quat.x(),
+      //                                       -curr_quat.y(), -curr_quat.z()));
+      // }
       prev_quat = curr_quat;
 
       extremum.thrusts.add(setpoint.input.thrusts);
@@ -127,6 +142,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
       extremum.collectiveThrust.add(setpoint.input.collective_thrust);
     }
     extremum.tilt.add(setpoint.state.getTiltedAngle());
+    extremum.pos.add(setpoint.state.p);
     extremum.omg.add(setpoint.input.omega);
     extremum.rpy.add(rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q())));
 
@@ -141,7 +157,8 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   // Add the last setpoint
   pvajs = polys.getPVAJS(t);
-  yaw << end_yaw, 0.0, 0.0;
+  yaw << desired_end_yaw, 0.0, 0.0;
+  // yaw << 0.0, 0.0, 0.0;
   if (rotation_type == RotationType::TILT_HEADING) {
     quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
   } else {
@@ -165,6 +182,7 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 }
 
 bool MincoSnapTrajectory::getSetpointVecByDist(const double sampleDistMeter, const bool forward_heading) {
+  const double desired_end_yaw = deg2rad(35);
 
   if (total_length_ < sampleDistMeter) {
     std::cout << "Undefined length or no waypoint" << std::endl;
@@ -179,6 +197,7 @@ bool MincoSnapTrajectory::getSetpointVecByDist(const double sampleDistMeter, con
   const double T = polys.getTotalDuration();
   const double total_length = total_length_;
   double length{0.0};
+  double lastHeading = desired_end_yaw;
 
   const int num_points = static_cast<int>(total_length / sampleDistMeter);
   for (int i = 0; i < num_points; ++i) {
@@ -192,7 +211,38 @@ bool MincoSnapTrajectory::getSetpointVecByDist(const double sampleDistMeter, con
     // std::cout  << "t: " << t << std::endl;
     // std::cout  << "length: " << length << std::endl;
     pvajs = polys.getPVAJS(t);
-    yaw << 0.0, 0.0, 0.0;
+    Eigen::Vector3d pos = pvajs.col(0);
+
+
+    // TODO: only support CONSTANT_HEADING and FORWARD_HEADING right now
+    if (heading_type == HeadingType::FORWARD_HEADING) {
+      double heading{0.0};
+      const auto pvajs_future = polys.getPVAJS(std::min(T, t + horizon));
+      const Eigen::Vector3d future_pos = pvajs_future.col(0);
+      const Eigen::Vector3d diff = future_pos - pos;
+      if (diff.head<2>().norm() > 0.001) {
+          heading = wrapMinusPiToPi(atan2(diff.y(), diff.x()));
+        } else {
+          if ((num_points - i) < 10) {
+            heading = desired_end_yaw;
+          } else {
+            heading = lastHeading;
+          }
+        }
+        // double yaw_rate = wrapAngleDifference(lastHeading, heading) / sampleTimeSec;
+
+        if (i == 0) {
+          yaw << deg2rad(35.0), 0.0, 0.0;
+        } else {
+          yaw << heading, 0.0, 0.0;
+        }
+        lastHeading = heading;
+    } else {
+      // std::cout << "start_yaw: " << rad2deg(start_yaw) << std::endl;
+      yaw << 0.0, 0.0, 0.0;
+    }
+
+    // yaw << 0.0, 0.0, 0.0;
     quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
     setpoints_dist.push_back(setpoint);
 

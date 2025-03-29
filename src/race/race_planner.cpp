@@ -104,7 +104,7 @@ bool RacePlanner::planAOS(std::shared_ptr<RaceTrack> track) {
                           solver_.data.traj.getPos(0.0);
     const double initHeading = std::atan2(diff.y(), diff.x());
     trajectory_ =
-        MincoSnapTrajectory(params_.qp.name, quad_, solver_.data, initHeading,
+        MincoSnapTrajectory(params_.qp.name, quad_, solver_.data, initHeading, endYaw,
                             track->getName() + " Trajectory");
     extremum_ = trajectory_.getSetpointVec(trajSampleTimeSec_, true);
   } else {

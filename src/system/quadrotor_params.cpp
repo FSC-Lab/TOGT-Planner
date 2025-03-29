@@ -96,9 +96,27 @@ bool QuadParams::load(const Yaml& yaml) {
     T_bm(3, 3) = yaml["tbm_r3"][3].as<double>();
     
     T_mb = T_bm.inverse();
+  } else if (yaml["BETAFLIGHT_CONFIG"].isDefined()) {
+      const double front_motor_x = yaml["front_motor_x"].as<double>();
+      const double front_motor_y = yaml["front_motor_y"].as<double>();
+
+      const double back_motor_x = yaml["back_motor_x"].as<double>();
+      const double back_motor_y = yaml["back_motor_y"].as<double>();
+
+      const double torque_coeff = yaml["torCoeff"].as<double>();
+
+      T_bm.row(0) = Eigen::Vector4d::Ones();
+      T_bm.row(1) = Eigen::Vector4d(-back_motor_y, -front_motor_y, back_motor_y, front_motor_y);
+      T_bm.row(2) = Eigen::Vector4d(back_motor_x, -front_motor_x, back_motor_x, -front_motor_x);
+      T_bm.row(3) = Eigen::Vector4d(torque_coeff, -torque_coeff, -torque_coeff, torque_coeff);
+
+      T_mb = T_bm.inverse();
+
+      std::cout << "BETAFLIGHT T_BM:\n" << T_bm << std::endl;
   } else {
     return false;
   }
+
 
   return true;
 }
