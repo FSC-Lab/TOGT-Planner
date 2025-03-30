@@ -975,6 +975,11 @@ double QuadManifold::computeRobustPenalityCost(
     quat_tmp(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
     quat_tmp(3) = tilt0 * s_half_psi;
 
+    // // TODO(chao)
+    // quat_tmp(1) = -quat_tmp(1);
+    // quat_tmp(2) = -quat_tmp(2);
+    // quat_tmp(3) = -quat_tmp(3);
+
     // bodyrate
     omg_den = zB2_1;
     omg_den_2 = omg_den * omg_den;
@@ -1593,10 +1598,14 @@ bool QuadManifold::toStateWithTiltYaw(const double t, const PVAJS3D &input, cons
     tilt2 = zB0 / tilt_den;
     q_tilt_last_ = Eigen::Quaterniond(tilt0, tilt1, tilt2, 0.0);
     
-    quat(0) = tilt0 * c_half_psi;
+    quat(0) = tilt0 * c_half_psi;  // w
     quat(1) = tilt1 * c_half_psi + tilt2 * s_half_psi;
     quat(2) = tilt2 * c_half_psi - tilt1 * s_half_psi;
     quat(3) = tilt0 * s_half_psi;
+
+    // quat(1) = -quat(1);
+    // quat(2) = -quat(2);
+    // quat(3) = -quat(3);
     // std::cout << "psi: " << psi << "\n";
     // std::cout << "c_half_psi: " << c_half_psi << "\n";
     // std::cout << "s_half_psi: " << s_half_psi << "\n";

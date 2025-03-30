@@ -144,7 +144,10 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
     extremum.tilt.add(setpoint.state.getTiltedAngle());
     extremum.pos.add(setpoint.state.p);
     extremum.omg.add(setpoint.input.omega);
-    extremum.rpy.add(rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q())));
+    Eigen::Vector3d rpy_deg = rad2deg(quaternionToEulerAnglesRPY(setpoint.state.q()));
+    extremum.rpy.add(rpy_deg);
+
+    std::cout << "t=" << t << "--- angle: " << rpy_deg.transpose() << " | omega: " << setpoint.input.omega.transpose() << std::endl;
 
     // Add a setpoint
     setpoints.push_back(setpoint);
@@ -157,8 +160,8 @@ TrajExtremum MincoSnapTrajectory::getSetpointVec(const double sampleTimeSec,
 
   // Add the last setpoint
   pvajs = polys.getPVAJS(t);
-  yaw << desired_end_yaw, 0.0, 0.0;
-  // yaw << 0.0, 0.0, 0.0;
+  // yaw << desired_end_yaw, 0.0, 0.0;
+  yaw << 0.0, 0.0, 0.0;
   if (rotation_type == RotationType::TILT_HEADING) {
     quad.toStateWithTiltYaw(t, pvajs, yaw, setpoint);
   } else {
